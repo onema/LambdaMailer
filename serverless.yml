@@ -1,0 +1,103 @@
+#
+# This file is part of the ONEMA onema Package.
+# For the full copyright and license information,
+# please view the LICENSE file that was distributed
+# with this source code.
+#
+# copyright (c) 2018, Juan Manuel Torres (http://onema.io)
+#
+# @author Juan Manuel Torres <kinojman@gmail.com>
+#
+service: lambda-mailer
+
+provider:
+  name: aws
+  runtime: java8
+  profile: default
+  timeout: 30
+  versionFunctions: false
+
+
+# you can overwrite defaults here
+  stage: dev
+  region: us-east-1
+
+# you can add statements to the Lambda function's IAM Role here
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - sns:Publish
+      Resource:
+        - "arn:aws:sns:*:*:${self:custom.environmentName}-mailer-bounce"
+        - "arn:aws:sns:*:*:${self:custom.environmentName}-bounce-error-topic"
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+      Resource:
+        - Fn::GetAtt: [ DynamoDBTable, Arn ]
+    - Effect: Allow
+      Action:
+        - ses:SendEmail
+        - ses:SendRawEmail
+      Resource:
+        - "*"
+
+# you can define service wide environment variables here
+  environment:
+    ENVIRONMENT_NAME: ${self:custom.environmentName}
+    SNS_ERROR_TOPIC: "arn:aws:sns:*:*:${self:custom.environmentName}-bounce-error-topic"
+
+# Custom values. These can be referenced in the Cloud Formation template
+custom:
+  environmentName: ${opt:stage, self:provider.stage}
+
+# you can add packaging information here
+# Make sure to run "sbt assembly" to create a jar file
+# with all your dependencies and put that jar file name here.
+package:
+  artifact: target/scala-2.12/app.jar
+
+functions:
+
+  # functions
+  mailer-bounce:
+    handler: onema.bounce.Function::lambdaHandler
+    events:
+      - sns: ${self:custom.environmentName}-mailer-bounce
+
+  mailer:
+    handler: onema.mailer.Function::lambdaHandler
+    events:
+      - sns: ${self:custom.environmentName}-mailer
+
+# you can add CloudFormation resource templates here
+resources:
+  Parameters:
+    TableName:
+      Type: String
+      Default: SESNotifications
+      Description: The name of the dynamodb table
+    PartitionKey:
+      Type: String
+      Default: MessageId
+      Description: The name of the main parition key
+    SortKey:
+      Type: String
+      Default: SnsPublishTime
+      Description: The name of the primary sort key
+    SecondaryIndex:
+      Type: String
+      Default: DestinationAddress
+      Description: The name of the secondary index
+    ReadCapacityUnits:
+      Default: 5
+      Description: Dynamo read capacity units
+      Type: Number
+    WriteCapacityUnits:
+      Default: 5
+      Description: Dynamo write capacity units
+      Type: Number
+
+  Resources: ${file(infrastructure/bounce-table_cfn.yml):Resources}
+

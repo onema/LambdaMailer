@@ -1,0 +1,80 @@
+Parameters:
+  TableName:
+    Type: String
+    Default: SESNotifications
+    Description: The name of the dynamodb table
+  PartitionKey:
+    Type: String
+    Default: MessageId
+    Description: The name of the main parition key
+  SortKey:
+    Type: String
+    Default: SnsPublishTime
+    Description: The name of the primary sort key
+  SecondaryIndex:
+    Type: String
+    Default: DestinationAddress
+    Description: The name of the secondary index
+  ReadCapacityUnits:
+    Default: 5
+    Description: Dynamo read capacity units
+    Type: Number
+  WriteCapacityUnits:
+    Default: 5
+    Description: Dynamo write capacity units
+    Type: Number
+
+Resources:
+
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Ref: TableName
+
+      AttributeDefinitions:
+      - AttributeName:
+          Ref: PartitionKey
+        AttributeType: S
+      - AttributeName:
+          Ref: SortKey
+        AttributeType: S
+      - AttributeName:
+          Ref: SecondaryIndex
+        AttributeType: S
+
+      KeySchema:
+      - AttributeName:
+          Ref: PartitionKey
+        KeyType: HASH
+      - AttributeName:
+          Ref: SortKey
+        KeyType: RANGE
+
+      GlobalSecondaryIndexes:
+      - IndexName: EmailIndex
+        KeySchema:
+        - AttributeName:
+            Ref: SecondaryIndex
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+      ProvisionedThroughput:
+        ReadCapacityUnits:
+          Ref: ReadCapacityUnits
+        WriteCapacityUnits:
+          Ref: WriteCapacityUnits
+
+      TimeToLiveSpecification:
+        AttributeName: ExpirationTime
+        Enabled: true
+
+Outputs:
+  EventsJsonArchive:
+    Value:
+      Ref: DynamoDBTable
+
