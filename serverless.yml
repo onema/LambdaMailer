@@ -34,8 +34,10 @@ provider:
       Action:
         - dynamodb:PutItem
         - dynamodb:GetItem
+        - dynamodb:Query
       Resource:
         - Fn::GetAtt: [ DynamoDBTable, Arn ]
+        - Fn::Join: ["/", [ Fn::GetAtt: [DynamoDBTable, Arn], "index", "*"]]
     - Effect: Allow
       Action:
         - ses:SendEmail
