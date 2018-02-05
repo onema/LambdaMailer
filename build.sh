@@ -2,6 +2,7 @@
 # Use this for local deployment
 # ./deploy.sh --aws-profile dev
 COMMAND=$1
+shift
 echo $COMMAND
 STAGE_NAME=${STAGE_NAME:-dev}
 
@@ -25,7 +26,7 @@ function install() {
 }
 
 function deploy() {
-    $PROFILE=$1
+    $PROFILE=$@
     serverless deploy --stage "${STAGE_NAME}" $PROFILE
     checkExitCode $?
 }
@@ -36,7 +37,7 @@ function cleanup() {
 }
 
 function remove() {
-    $PROFILE=$1
+    $PROFILE=$@
     serverless remove --stage "${STAGE_NAME}"
     checkExitCode $?
 }
