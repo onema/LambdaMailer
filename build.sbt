@@ -4,7 +4,7 @@ lazy val root = (project in file("."))
 .settings(
   organization := "onema",
 
-  name := "lambda-sample-request",
+  name := "lambda-mailer",
 
   version := "0.1.0",
 
