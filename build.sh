@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Use this for local deployment
-# ./deploy.sh --aws-profile dev
+# ./build.sh --profile staging
 COMMAND=$1
-shift
 echo $COMMAND
+STAGE_NAME=$2
+shift 2
 STAGE_NAME=${STAGE_NAME:-dev}
 
 function checkExitCode() {
@@ -26,8 +27,8 @@ function install() {
 }
 
 function deploy() {
-    $PROFILE=$@
-    serverless deploy --stage "${STAGE_NAME}" $PROFILE
+    echo $@
+    serverless deploy --stage "${STAGE_NAME}" $@
     checkExitCode $?
 }
 
@@ -37,8 +38,8 @@ function cleanup() {
 }
 
 function remove() {
-    $PROFILE=$@
-    serverless remove --stage "${STAGE_NAME}"
+    echo $@
+    serverless remove --stage "${STAGE_NAME}" $@
     checkExitCode $?
 }
 
@@ -47,20 +48,19 @@ case "$COMMAND" in
          install ;;
 
     'deploy')
-        $PROFILE=$@
 #        install
-        deploy $PROFILE
+        deploy $@
         cleanup ;;
 
     'remove')
-        $PROFILE=$@
-        remove $PROFILE ;;
+        remove  $@
+        ;;
 
     'cleanup')
         cleanup ;;
 
     *)
-        echo """usage: deploy.sh [COMMAND]
+        echo """usage: deploy.sh [COMMAND] [STATE_NAME]
             install         Installs all packages and moves source code to a package directory.
             deploy          Installs, deploys and cleans up package. Deployment uses serverless framework.
             cleanup         Removes the package directory.

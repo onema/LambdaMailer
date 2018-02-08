@@ -13,7 +13,7 @@ lazy val root = (project in file("."))
   libraryDependencies ++= {
     Seq(
       // CORE!
-      "onema"                     % "serverless-base_2.12"      % "0.2.0",
+      "onema"                     % "serverless-base_2.12"      % "0.3.0",
 
       // AWS Clients
       "com.amazonaws"             % "aws-java-sdk-sqs"          % "1.11.228",
