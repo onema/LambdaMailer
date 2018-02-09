@@ -47,7 +47,7 @@ object Logic {
   }
 }
 
-class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val tableName: String) {
+class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val tableName: String, val shouldLogEmail: Boolean) {
 
   //--- Fields ---
   protected val log = Logger("mailer-logic")
@@ -60,9 +60,12 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
     val filteredEmails = email.copy(to = email.to.filter(isNotBlocked))
 
     if(filteredEmails.to.nonEmpty) {
-      log.info(s"Sending email to ${filteredEmails.to}")
+      val value = if(shouldLogEmail) filteredEmails.to else s"${filteredEmails.to.size} emails"
+      log.info(s"Sending email to $value")
       sendEmail(filteredEmails)
-    } else log.info(s"Email ${email.to.head} is blocked")
+    } else {
+      log.info(s"All emails are blocked")
+    }
   }
 
   def sendEmail(email: Email): Unit = {

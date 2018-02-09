@@ -27,7 +27,8 @@ class Function extends SnsHandler {
   val logic = new Logic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
-    "SESNotifications"
+    "SESNotifications",
+    logEmail
   )
 
   //--- Methods ---
@@ -35,5 +36,11 @@ class Function extends SnsHandler {
     log.info(event.javaClassToJson)
     val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
     handle(() => logic.handleRequest(snsRecord))
+  }
+
+  private def logEmail = {
+    val shouldLog = sys.env.getOrElse("LOG_EMAIL", "false")
+    if(shouldLog.toLowerCase() == "true") true
+    else false
   }
 }
