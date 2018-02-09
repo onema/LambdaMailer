@@ -16,10 +16,9 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClientBuilder
 import onema.core.json.Implicits._
-import onema.mailer.Logic.Email
+import onema.serverlessbase.function.SnsHandler
 
 import scala.collection.JavaConverters._
-import onema.serverlessbase.function.SnsHandler
 
 class Function extends SnsHandler {
 
