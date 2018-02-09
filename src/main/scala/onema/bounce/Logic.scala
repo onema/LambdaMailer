@@ -62,12 +62,14 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
     val snsTopicArn = snsRecord.getTopicArn
     val sesMessage = snsRecord.getMessage.jsonParse[SnsNotification]
     val sesMessageId = sesMessage.mail.messageId
-    val sesDestinationAddress = sesMessage.mail.destination.mkString(", ")
+    val sesDestinationAddresses = sesMessage.bounce.bouncedRecipients
 
     if(sesMessage.notificationType == "Bounce") {
       val reportingMta = sesMessage.bounce.reportingMTA
       val sesBounceSummary = sesMessage.bounce.bouncedRecipients.toJson
-      tryPutRecord(sesMessageId, snsPublishTime, reportingMta, sesDestinationAddress, sesBounceSummary, sesMessage.notificationType)
+      sesDestinationAddresses.foreach(destination => {
+        tryPutRecord(sesMessageId, snsPublishTime, reportingMta, destination.emailAddress, sesBounceSummary, sesMessage.notificationType)
+      })
     }
   }
 
