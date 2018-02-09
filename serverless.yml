@@ -48,6 +48,7 @@ provider:
 # you can define service wide environment variables here
   environment:
     ENVIRONMENT_NAME: ${self:custom.environmentName}
+    LOG_EMAIL: false
     SNS_ERROR_TOPIC: "arn:aws:sns:*:*:${self:custom.environmentName}-bounce-error-topic"
 
 # Custom values. These can be referenced in the Cloud Formation template
