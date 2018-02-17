@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
 
 
 object Logic {
-  case class SnsNotification(notificationType: String = "", bounce: Bounce = Bounce(), mail: Mail = Mail())
+  case class SnsNotification(notificationType: String = "", bounce: Bounce = Bounce(), complaint: Complaint = Complaint(), mail: Mail = Mail())
   case class Bounce(
     bounceType: String = "",
     bounceSubType: String = "",
@@ -48,6 +48,15 @@ object Logic {
   case class BouncedRecipients(emailAddress: String = "", action: String = "", status: String = "", diagnosticCode: String = "")
   case class Headers(name: String = "", value: String = "")
   case class CommonHeaders(from: List[String] = List(), to: List[String] = List(), subject: String = "")
+  case class ComplainedRecipients(emailAddress: String = "")
+  case class Complaint(
+    userAgent: String = "",
+    complainedRecipients: List[ComplainedRecipients] = List(),
+    complaintFeedbackType: String = "",
+    arrivalDate: String = "",
+    timestamp: String = "",
+    feedbackId: String = ""
+  )
 }
 
 class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
@@ -62,23 +71,40 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
     val snsTopicArn = snsRecord.getTopicArn
     val sesMessage = snsRecord.getMessage.jsonParse[SnsNotification]
     val sesMessageId = sesMessage.mail.messageId
-    val sesDestinationAddresses = sesMessage.bounce.bouncedRecipients
 
     if(sesMessage.notificationType == "Bounce") {
+      val sesDestinationAddresses = sesMessage.bounce.bouncedRecipients
       val reportingMta = sesMessage.bounce.reportingMTA
       val sesBounceSummary = sesMessage.bounce.bouncedRecipients.toJson
       sesDestinationAddresses.foreach(destination => {
-        tryPutRecord(sesMessageId, snsPublishTime, reportingMta, destination.emailAddress, sesBounceSummary, sesMessage.notificationType)
+        tryPutBounceRecord(sesMessageId, snsPublishTime, reportingMta, destination.emailAddress, sesBounceSummary, sesMessage.notificationType)
+      })
+    } else if(sesMessage.notificationType == "Complaint") {
+      val sesDestinationAddresses = sesMessage.complaint.complainedRecipients
+      val feedbackId = sesMessage.complaint.feedbackId
+      val feedbackType = sesMessage.complaint.complaintFeedbackType
+      sesDestinationAddresses.foreach(destination => {
+
+        tryPutComplaintRecord(sesMessageId, snsPublishTime, feedbackId, destination.emailAddress, feedbackType)
       })
     }
   }
 
-  def tryPutRecord(messageId: String, publishTime: String, reportingMTA: String, destinationAddress: String, summary: String, messageType: String): Unit = {
+  def tryPutBounceRecord(messageId: String, publishTime: String, reportingMTA: String, destinationAddress: String, summary: String, messageType: String): Unit = {
     Try(recordBounce(messageId, publishTime, reportingMTA, destinationAddress, summary, messageType)) match {
       case Success(response) =>
-        log.info("Successfully recorded event")
+        log.info("Successfully recorded bounce event")
       case Failure(ex) =>
-        log.error("Unable to write record")
+        log.error("Unable to write bounce record")
+        throw ex
+    }
+  }
+  def tryPutComplaintRecord(messageId: String, publishTime: String, feedbackId: String, sesDestinationAddress: String, feedbackType: String): Unit = {
+    Try(recordComplaint(messageId, publishTime, feedbackId, sesDestinationAddress, feedbackType)) match {
+      case Success(response) =>
+        log.info("Successful recorded complaint event")
+      case Failure(ex) =>
+        log.error("Unable to write complaint record")
         throw ex
     }
   }
@@ -95,6 +121,20 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
         "SESBounceSummary" -> new AttributeValue().withS(summary),
         "SESMessageType" -> new AttributeValue().withS(messageType),
         "ExpirationTime" -> new AttributeValue().withN(((System.currentTimeMillis / 1000) + TTL).toString)
+      ).asJava
+    )
+  }
+
+  def recordComplaint(messageId: String, publishTime: String, feedbackId: String, destinationAddress: String, feedbackType: String): PutItemResult = {
+    log.debug(s"messageId: $messageId, publishTime: $publishTime, destination: $destinationAddress, feedbackType: $feedbackType")
+    dynamodbClient.putItem(
+      table,
+      Map(
+        "MessageId" -> new AttributeValue().withS(messageId),
+        "DestinationAddress" -> new AttributeValue().withS(destinationAddress),
+        "SnsPublishTime" -> new AttributeValue().withS(publishTime),
+        "FeedbackId" -> new AttributeValue().withS(feedbackId),
+        "FeedbackType" -> new AttributeValue().withS(feedbackType)
       ).asJava
     )
   }

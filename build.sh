@@ -60,7 +60,7 @@ case "$COMMAND" in
         cleanup ;;
 
     *)
-        echo """usage: deploy.sh [COMMAND] [STATE_NAME]
+        echo """usage: deploy.sh [COMMAND] [STAGE_NAME]
             install         Installs all packages and moves source code to a package directory.
             deploy          Installs, deploys and cleans up package. Deployment uses serverless framework.
             cleanup         Removes the package directory.
