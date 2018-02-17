@@ -48,7 +48,7 @@ case "$COMMAND" in
          install ;;
 
     'deploy')
-#        install
+        install
         deploy $@
         cleanup ;;
 
