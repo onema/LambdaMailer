@@ -4,13 +4,11 @@ LambdaMailer
 Description
 -----------
 
-Serverless application to send emails using SES and Lambda. This is a simple
-serverless application to send emails using AWS Simple Email Service SES and
-AWS Lambda.
+Serverless application to send emails using SES and Lambda.
 
-The project defines two lambda functions
-1. mailer
-1. mailer-bouce
+The project defines two lambda functions and a dynamodb table to keep track of bounces and complaints
+
+![Serverless Lambda Mailer](docs/img/ServerlessLambdaMailer.png)
 
 ### Lambda Mailer
 This lambda function is triggered via SNS, and the payload of the message is
