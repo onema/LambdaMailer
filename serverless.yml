@@ -28,8 +28,8 @@ provider:
       Action:
         - sns:Publish
       Resource:
-        - "arn:aws:sns:*:*:${self:custom.environmentName}-mailer-bounce"
-        - "arn:aws:sns:*:*:${self:custom.environmentName}-bounce-error-topic"
+        - "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
+        - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-error-topic"
     - Effect: Allow
       Action:
         - dynamodb:PutItem
@@ -47,13 +47,13 @@ provider:
 
 # you can define service wide environment variables here
   environment:
-    ENVIRONMENT_NAME: ${self:custom.environmentName}
+    STAGE_NAME: ${self:custom.stageName}
     LOG_EMAIL: false
-    SNS_ERROR_TOPIC: "arn:aws:sns:*:*:${self:custom.environmentName}-bounce-error-topic"
+    SNS_ERROR_TOPIC: "arn:aws:sns:*:*:${self:custom.stageName}-bounce-error-topic"
 
 # Custom values. These can be referenced in the Cloud Formation template
 custom:
-  environmentName: ${opt:stage, self:provider.stage}
+  stageName: ${opt:stage, self:provider.stage}
 
 # you can add packaging information here
 # Make sure to run "sbt assembly" to create a jar file
@@ -67,12 +67,12 @@ functions:
   mailer-bounce:
     handler: onema.bounce.Function::lambdaHandler
     events:
-      - sns: ${self:custom.environmentName}-mailer-bounce
+      - sns: ${self:custom.stageName}-mailer-bounce
 
   mailer:
     handler: onema.mailer.Function::lambdaHandler
     events:
-      - sns: ${self:custom.environmentName}-mailer
+      - sns: ${self:custom.stageName}-mailer
 
 # you can add CloudFormation resource templates here
 resources:
