@@ -10,7 +10,7 @@
   */
 
 import onema.bounce.Logic.SnsNotification
-import onema.core.json.Implicits.JsonStringToCaseClass
+import onema.core.json.Implicits._
 import org.scalatest.{FlatSpec, Matchers}
 
 
