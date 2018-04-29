@@ -21,7 +21,7 @@ import onema.serverlessbase.function.LambdaHandler
 
 import scala.collection.JavaConverters._
 
-class Function extends LambdaHandler with EnvLambdaConfiguration {
+class Function extends LambdaHandler[Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
   override protected val snsClient: AmazonSNSAsync = AmazonSNSAsyncClientBuilder.defaultClient()
