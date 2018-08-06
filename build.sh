@@ -27,7 +27,8 @@ function install() {
 }
 
 function deploy() {
-    echo $@
+    shift 1
+    echo ${STAGE_NAME}
     serverless deploy --stage "${STAGE_NAME}" $@
     checkExitCode $?
 }

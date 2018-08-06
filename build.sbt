@@ -2,18 +2,18 @@ resolvers += "Onema Snapshots" at "s3://s3-us-east-1.amazonaws.com/ones-deployme
 
 lazy val root = (project in file("."))
 .settings(
-  organization := "onema",
+  organization := "io.onema",
 
   name := "lambda-mailer",
 
-  version := "0.1.0",
+  version := "0.2.0",
 
   scalaVersion := "2.12.5",
 
   libraryDependencies ++= {
     Seq(
       // Serverless Base!
-      "onema"                     % "serverless-base_2.12"      % "0.6.0",
+      "io.onema"                  % "serverless-base_2.12"      % "0.7.0",
 
       // AWS Clients
       "com.amazonaws"             % "aws-java-sdk-ses"          % "1.11.271",

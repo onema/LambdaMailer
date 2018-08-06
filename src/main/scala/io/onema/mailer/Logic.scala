@@ -9,7 +9,9 @@
   * @author Juan Manuel Torres <kinojman@gmail.com>
   */
 
-package onema.mailer
+package io.onema.mailer
+
+import java.nio.ByteBuffer
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec
@@ -19,14 +21,14 @@ import com.amazonaws.services.lambda.runtime.events.SNSEvent.SNS
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService
 import com.amazonaws.services.simpleemail.model._
 import com.typesafe.scalalogging.Logger
-import onema.core.json.Implicits._
-import onema.mailer.Logic.Email
+import io.onema.json.Extensions._
+import io.onema.mailer.Logic.Email
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 object Logic {
-  case class Email(to: List[String], from: String, subject: String, body: String, replyTo: String = "") {
+  case class Email(to: Seq[String], from: String, subject: String, body: String, replyTo: String = "", raw: Boolean = false) {
     lazy val request: SendEmailRequest = {
       val destination = new Destination().withToAddresses(to.asJava)
       val message = new Message().withBody(
@@ -44,6 +46,15 @@ object Logic {
       if(replyTo.nonEmpty) request.withReplyToAddresses(replyTo)
       else request
     }
+
+    lazy val rawRequest: SendRawEmailRequest = {
+      val message = new RawMessage().withData(ByteBuffer.wrap(body.getBytes()))
+      val request = new SendRawEmailRequest()
+        .withDestinations(to.asJava)
+        .withRawMessage(message)
+        .withSource(from)
+      request
+    }
   }
 }
 
@@ -56,7 +67,7 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
 
   //--- Methods ---
   def handleRequest(snsRecord: SNS): Unit = {
-    val email = snsRecord.getMessage.jsonParse[Email]
+    val email = snsRecord.getMessage.jsonDecode[Email]
     val filteredEmails = email.copy(to = email.to.filter(isNotBlocked))
 
     if(filteredEmails.to.nonEmpty) {
@@ -69,7 +80,11 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
   }
 
   def sendEmail(email: Email): Unit = {
-    sesClient.sendEmail(email.request)
+    if(email.raw) {
+      sesClient.sendRawEmail(email.rawRequest)
+    } else {
+      sesClient.sendEmail(email.request)
+    }
     log.info("Email sent successfully")
   }
 

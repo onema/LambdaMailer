@@ -9,14 +9,14 @@
   * @author Juan Manuel Torres <kinojman@gmail.com>
   */
 
-package onema.bounce
+package io.onema.bounce
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, PutItemResult}
 import com.amazonaws.services.lambda.runtime.events.SNSEvent.SNS
 import com.typesafe.scalalogging.Logger
-import onema.bounce.Logic.SnsNotification
-import onema.core.json.Implicits._
+import io.onema.bounce.Logic.SnsNotification
+import io.onema.json.Extensions._
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -69,13 +69,13 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
   def handleRequest(snsRecord: SNS): Unit = {
     val snsPublishTime = snsRecord.getTimestamp.toString("yyyy-MM-dd'T'HH:mm:ss'Z'")
     val snsTopicArn = snsRecord.getTopicArn
-    val sesMessage = snsRecord.getMessage.jsonParse[SnsNotification]
+    val sesMessage = snsRecord.getMessage.jsonDecode[SnsNotification]
     val sesMessageId = sesMessage.mail.messageId
 
     if(sesMessage.notificationType == "Bounce") {
       val sesDestinationAddresses = sesMessage.bounce.bouncedRecipients
       val reportingMta = sesMessage.bounce.reportingMTA
-      val sesBounceSummary = sesMessage.bounce.bouncedRecipients.toJson
+      val sesBounceSummary = sesMessage.bounce.bouncedRecipients.asJson
       sesDestinationAddresses.foreach(destination => {
         tryPutBounceRecord(sesMessageId, snsPublishTime, reportingMta, destination.emailAddress, sesBounceSummary, sesMessage.notificationType)
       })

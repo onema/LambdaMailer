@@ -47,6 +47,18 @@ emails. If the email is found in the table, it is filtered out.
 You must subscribe the bounce and complaint notifications to the bounce. See the installation section
 for more information.
 
+### Lambda Mailer Forwarder
+The forwarder allows you to receive messages sent by a SES rule set via SNS. 
+
+The forwarder will receive emails sent to the given address and forward them to the associated email addresses.
+
+The association is a mapping that has the following format:
+
+```
+spam@example.com=my.rea.email@gmail.com,anotheremail@yahoo.com&foobar@example2.com=some@email.com
+```
+and it must be assigned to the `EMAIL_MAPPING` environment variable. 
+
 Installation
 ------------
 You must build the project before it is deployed using SBT:

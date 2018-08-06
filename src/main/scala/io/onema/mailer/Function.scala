@@ -9,15 +9,16 @@
   * @author Juan Manuel Torres <kinojman@gmail.com>
   */
 
-package onema.bounce
+package io.onema.mailer
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
+import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClientBuilder
 import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
-import onema.core.json.Implicits._
-import onema.serverlessbase.configuration.lambda.EnvLambdaConfiguration
-import onema.serverlessbase.function.LambdaHandler
+import io.onema.json.JavaExtensions._
+import io.onema.serverlessbase.configuration.lambda.EnvLambdaConfiguration
+import io.onema.serverlessbase.function.LambdaHandler
 
 import scala.collection.JavaConverters._
 
@@ -26,12 +27,22 @@ class Function extends LambdaHandler[Unit] with EnvLambdaConfiguration {
   //--- Fields ---
   override protected val snsClient: AmazonSNSAsync = AmazonSNSAsyncClientBuilder.defaultClient()
 
-  val logic = new Logic(AmazonDynamoDBAsyncClientBuilder.defaultClient(), "SESNotifications")
+  val logic = new Logic(
+    AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
+    AmazonDynamoDBAsyncClientBuilder.defaultClient(),
+    "SESNotifications",
+    logEmail
+  )
 
   //--- Methods ---
   def lambdaHandler(event: SNSEvent, context: Context): Unit = {
-    log.info(event.javaClassToJson)
+    log.info(event.asJson)
     val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
     handle(logic.handleRequest(snsRecord))
+  }
+
+  private def logEmail = {
+    val shouldLog = getValue("/log/email")
+    if(shouldLog.isDefined && shouldLog.get.toLowerCase() == "true") true else false
   }
 }
