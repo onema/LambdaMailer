@@ -18,8 +18,6 @@ import com.typesafe.scalalogging.Logger
 import io.onema.forwarder.Logic.{EmailMessage, SesMessage}
 import io.onema.json.Extensions._
 
-import scala.util.{Failure, Success, Try}
-
 object Logic {
   case class SesMessage(notificationType: String, mail: Mail, receipt: Receipt, content: String)
   case class Headers(name: String, value: String)
@@ -47,7 +45,7 @@ object Logic {
     action: Action
   )
 
-  case class EmailMessage(to: Seq[String], from: String, subject: String, body: String, replyTo: String = "")
+  case class EmailMessage(to: Seq[String], from: String, subject: String, body: String, replyTo: String = "", raw: Boolean = false)
 
 }
 class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String, val snsClient: AmazonSNSAsync, val mailerTopic: String) {
@@ -64,15 +62,24 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String, val snsC
     val allowedForwardingEmailMapping = parseEmailMapping(emailMapping)
     val resultingForwardingEmails = getForwardingEmailAddresses(message.mail.destination, allowedForwardingEmailMapping)
     val subject = message.mail.commonHeaders.subject
-    val content = message.content.split("Content-Type: ")
-    val replyTo = message.mail.commonHeaders.returnPath
-    val text = getTextFromContent(content)
+    val replyTo = message.mail.commonHeaders.from.head
+    val origin = message.mail.source
+    log.debug(resultingForwardingEmails.toString())
     resultingForwardingEmails.foreach(x => {
       val from = x._1
-      val to = x._2
-      val emailMessage = EmailMessage(to, from, subject, text, replyTo).asJson
-      log.debug(s"Json Message: $emailMessage")
-      snsClient.publish(mailerTopic, emailMessage)
+      val toEmails = x._2
+      toEmails.foreach(to => {
+        log.debug(s"FROM: $from TO: $to REPLY-TO: $replyTo ORIGIN: $origin")
+        var rawContent = message.content
+          // Replace all the origin email address with the new from address
+          .replaceFirst(s"(From: $replyTo)", s"From: $from\r\nReply-To: $replyTo")
+          .replaceAll(s"Return-Path: <$origin>", s"Return-Path: <$from>")
+          .replaceAll(s"(envelope-from=$origin)", s"envelope-from=$from")
+
+        val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo, raw = true).asJson
+        log.debug(s"Json Message: $emailMessage")
+        snsClient.publish(mailerTopic, emailMessage)
+      })
     })
   }
 
@@ -90,24 +97,6 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String, val snsC
     val resultingEmailsMapping = allowedForwardingEmailMapping.filterKeys(destination.contains)
     if(resultingEmailsMapping.nonEmpty) resultingEmailsMapping
     else throw new Exception(s"The destination emails $destination, do not contain a valid mapping in the configuration")
-  }
-
-  private def getTextFromContent(content: Seq[String]): String = {
-    val plainText = Try(getFromContent(content,"text/plain")) match {
-      case Success(seq) => seq
-      case Failure(ex) => Seq()
-    }
-    val htmlText = Try(getFromContent(content, "text/html")) match {
-      case Success(seq) => seq
-      case Failure(ex) => Seq()
-    }
-    if(htmlText.nonEmpty) htmlText.mkString else plainText.mkString("<br />")
-  }
-
-  private def getFromContent(content: Seq[String], sectionName: String): Seq[String] = {
-    content
-      .filter(x => x.contains(sectionName))
-      .head.split("\\r?\\n").drop(1).dropRight(1).filter(x => !x.contains("Content-Transfer-Encoding:"))
   }
 }
 
