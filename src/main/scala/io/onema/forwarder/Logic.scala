@@ -46,19 +46,16 @@ object Logic {
   )
 
   case class EmailMessage(to: Seq[String], from: String, subject: String, body: String, replyTo: String = "", raw: Boolean = false)
-
 }
-class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String, val snsClient: AmazonSNSAsync, val mailerTopic: String) {
+
+class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
 
-
-
   //--- Methods ---
-  def handleRequest(snsRecord: SNS, emailMapping: String): Unit = {
+  def handleRequest(message: SesMessage, emailMapping: String): Unit = {
     log.debug(s"Mailer Topic: $mailerTopic")
-    val message = snsRecord.getMessage.jsonDecode[SesMessage]
     val allowedForwardingEmailMapping = parseEmailMapping(emailMapping)
     val resultingForwardingEmails = getForwardingEmailAddresses(message.mail.destination, allowedForwardingEmailMapping)
     val subject = message.mail.commonHeaders.subject
@@ -96,7 +93,7 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String, val snsC
   private def getForwardingEmailAddresses(destination: Seq[String], allowedForwardingEmailMapping: Map[String, Seq[String]]): Map[String, Seq[String]] = {
     val resultingEmailsMapping = allowedForwardingEmailMapping.filterKeys(destination.contains)
     if(resultingEmailsMapping.nonEmpty) resultingEmailsMapping
-    else throw new Exception(s"The destination emails $destination, do not contain a valid mapping in the configuration")
+    else throw new Exception(s"The destination emails $destination, do not contain a valid mapping in the configuration. Received $destination, allowed $allowedForwardingEmailMapping")
   }
 }
 
