@@ -15,7 +15,7 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
 import io.onema.forwarder.Logic.SesMessage
-import io.onema.json.JavaExtensions._
+import io.onema.json.Extensions._
 import io.onema.serverlessbase.configuration.lambda.EnvLambdaConfiguration
 import io.onema.serverlessbase.function.LambdaHandler
 
@@ -38,7 +38,10 @@ class Function extends LambdaHandler[Unit] with EnvLambdaConfiguration {
     // and parse it into a dictionary of [sender, recipients] where the recipients are a sequence of strings
     val emailMapping = getValue("email/mapping")
     val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
-    val sesMessage: SesMessage = snsRecord.getMessage.jsonDecode
+
+    log.debug(snsRecord.getMessage)
+
+    val sesMessage: SesMessage = snsRecord.getMessage.jsonDecode[SesMessage]
     handle {
       logic.handleRequest(sesMessage, emailMapping.getOrElse(""))
     }

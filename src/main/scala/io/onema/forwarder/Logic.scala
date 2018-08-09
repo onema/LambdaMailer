@@ -11,8 +11,6 @@
 
 package io.onema.forwarder
 
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
-import com.amazonaws.services.lambda.runtime.events.SNSEvent.SNS
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.typesafe.scalalogging.Logger
 import io.onema.forwarder.Logic.{EmailMessage, SesMessage}
@@ -67,10 +65,10 @@ class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
       val toEmails = x._2
       toEmails.foreach(to => {
         log.debug(s"FROM: $from TO: $to REPLY-TO: $replyTo ORIGIN: $origin")
-        var rawContent = message.content
+        val rawContent = message.content
           // Replace all the origin email address with the new from address
-          .replaceFirst(s"(From: $replyTo)", s"From: $from\r\nReply-To: $replyTo")
-          .replaceAll(s"Return-Path: <$origin>", s"Return-Path: <$from>")
+          .replaceFirst(s"From: .+[\\r\\n]", s"From: $from\r\nReply-To: $replyTo")
+          .replaceAll(s"Return-Path:.+(\\r\\n)", s"Return-Path: <$from>\r\n")
           .replaceAll(s"(envelope-from=$origin)", s"envelope-from=$from")
 
         val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo, raw = true).asJson
