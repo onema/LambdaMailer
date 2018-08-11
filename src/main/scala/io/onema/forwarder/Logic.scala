@@ -66,9 +66,11 @@ class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
       toEmails.foreach(to => {
         log.debug(s"FROM: $from TO: $to REPLY-TO: $replyTo ORIGIN: $origin")
         val rawContent = message.content
+
           // Replace all the origin email address with the new from address
-          .replaceFirst(s"From: .+[\\r\\n]", s"From: $from\r\nReply-To: $replyTo")
-          .replaceAll(s"Return-Path:.+(\\r\\n)", s"Return-Path: <$from>\r\n")
+          .replaceFirst("Reply-to: .+(\\r\\n)", "")
+          .replaceFirst(s"From: .+(\\r\\n)", s"From: $from\r\nReply-To: $replyTo\r\n")
+          .replaceAll(s"Return-Path: .+(\\r\\n)", s"Return-Path: <$from>\r\n")
           .replaceAll(s"(envelope-from=$origin)", s"envelope-from=$from")
 
         val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo, raw = true).asJson

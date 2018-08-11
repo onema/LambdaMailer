@@ -30,7 +30,6 @@ class Function extends LambdaHandler[Unit] with EnvLambdaConfiguration {
 
   //--- Methods ---
   def lambdaHandler(event: SNSEvent, context: Context): Unit = {
-    log.info(event.asJson)
     val accountId = context.getInvokedFunctionArn.split(':')(4)
     val region = getValue("aws/region").get
 
