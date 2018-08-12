@@ -6,7 +6,7 @@
   *
   * copyright (c) 2018, Juan Manuel Torres (http://onema.io)
   *
-  * @author Juan Manuel Torres <kinojman@gmail.com>
+  * @author Juan Manuel Torres <software@onema.io>
   */
 
 import io.onema.bounce.Logic.SnsNotification
@@ -29,4 +29,6 @@ class ModelSerializationTest extends FlatSpec with Matchers {
     sesMessage.bounce.bounceType should be ("Permanent")
     sesMessage.mail.source should be ("test@foobar.com")
   }
+
+  "Input stream serialization"
 }

@@ -77,4 +77,5 @@ class ForwarderLogicTest extends FlatSpec with Matchers with MockFactory {
     logic.handleRequest(sesMessage, emailMapping)
 
   }
+
 }

@@ -6,14 +6,14 @@ lazy val root = (project in file("."))
 
   name := "lambda-mailer",
 
-  version := "0.2.0",
+  version := "0.3.0",
 
   scalaVersion := "2.12.5",
 
   libraryDependencies ++= {
     Seq(
       // Serverless Base!
-      "io.onema"                  % "serverless-base_2.12"      % "0.7.0",
+//      "io.onema"                  % "serverless-base_2.12"      % "0.8.0",
 
       // AWS Clients
       "com.amazonaws"             % "aws-java-sdk-ses"          % "1.11.271",
@@ -29,10 +29,10 @@ lazy val root = (project in file("."))
     )
   }
 )
-//.dependsOn(serverlessBase)
+.dependsOn(serverlessBase)
 
 // Sub-projects
-//lazy val serverlessBase = RootProject(file("../ServerlessBase"))
+lazy val serverlessBase = RootProject(file("../ServerlessBase"))
 
 // Assembly
 assemblyJarName in assembly := "app.jar"

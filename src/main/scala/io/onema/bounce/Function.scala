@@ -6,7 +6,7 @@
   *
   * copyright (c) 2018, Juan Manuel Torres (http://onema.io)
   *
-  * @author Juan Manuel Torres <kinojman@gmail.com>
+  * @author Juan Manuel Torres <software@onema.io>
   */
 
 package io.onema.bounce
@@ -14,24 +14,21 @@ package io.onema.bounce
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
-import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
 import io.onema.json.JavaExtensions._
 import io.onema.serverlessbase.configuration.lambda.EnvLambdaConfiguration
 import io.onema.serverlessbase.function.LambdaHandler
 
 import scala.collection.JavaConverters._
 
-class Function extends LambdaHandler[Unit] with EnvLambdaConfiguration {
+class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
-  override protected val snsClient: AmazonSNSAsync = AmazonSNSAsyncClientBuilder.defaultClient()
-
   val logic = new Logic(AmazonDynamoDBAsyncClientBuilder.defaultClient(), "SESNotifications")
 
   //--- Methods ---
-  def lambdaHandler(event: SNSEvent, context: Context): Unit = {
+  override def execute(event: SNSEvent, context: Context): Unit = {
     log.info(event.asJson)
     val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
-    handle(logic.handleRequest(snsRecord))
+    logic.handleRequest(snsRecord)
   }
 }
