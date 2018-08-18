@@ -68,7 +68,7 @@ class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
         val rawContent = message.content
 
           // Replace all the origin email address with the new from address
-          .replaceFirst("Reply-to: .+(\\r\\n)", "")
+          .replaceFirst("[Rr]eply-[Tt]o: .+(\\r\\n)", "")
           .replaceFirst(s"From: .+(\\r\\n)", s"From: $from\r\nReply-To: $replyTo\r\n")
           .replaceAll(s"Return-Path: .+(\\r\\n)", s"Return-Path: <$from>\r\n")
           .replaceAll(s"(envelope-from=$origin)", s"envelope-from=$from")
