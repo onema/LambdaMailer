@@ -1,7 +1,7 @@
 Parameters:
   TableName:
     Type: String
-    Default: SESNotifications
+    Default: LambdaMailerSESNotifications
     Description: The name of the dynamodb table
   PartitionKey:
     Type: String

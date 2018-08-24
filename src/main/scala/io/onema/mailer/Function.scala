@@ -24,11 +24,10 @@ import scala.collection.JavaConverters._
 class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
-
   val logic = new Logic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
-    "SESNotifications",
+    getValue("/table/name").getOrElse("LambdaMailerSESNotifications"),
     logEmail
   )
 

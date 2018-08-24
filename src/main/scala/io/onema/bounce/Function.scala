@@ -23,7 +23,10 @@ import scala.collection.JavaConverters._
 class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
-  val logic = new Logic(AmazonDynamoDBAsyncClientBuilder.defaultClient(), "SESNotifications")
+  val logic = new Logic(
+    AmazonDynamoDBAsyncClientBuilder.defaultClient(),
+    getValue("/table/name").getOrElse("LambdaMailerSESNotifications")
+  )
 
   //--- Methods ---
   override def execute(event: SNSEvent, context: Context): Unit = {

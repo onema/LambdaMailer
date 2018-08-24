@@ -29,7 +29,7 @@ provider:
         - sns:Publish
       Resource:
         - "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
-        - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-error-topic"
+        - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-topic"
         - "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
     - Effect: Allow
       Action:
@@ -51,7 +51,7 @@ provider:
     STAGE_NAME: ${self:custom.stageName}
     LOG_EMAIL: false
     SNS_ERROR_TOPIC:
-      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId","${self:custom.stageName}-bounce-error-topic"]]
+      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId","${self:custom.stageName}-error-topic"]]
     SNS_MAILER_TOPIC:
       Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
 
@@ -70,11 +70,17 @@ functions:
   # functions
   mailer-bounce:
     handler: io.onema.bounce.Function::lambdaHandler
+    environment:
+      TABLE_NAME:
+        Ref: TableName
     events:
       - sns: ${self:custom.stageName}-mailer-bounce
 
   mailer:
     handler: io.onema.mailer.Function::lambdaHandler
+    environment:
+      TABLE_NAME:
+        Ref: TableName
     events:
       - sns: ${self:custom.stageName}-mailer
 
@@ -90,7 +96,7 @@ resources:
   Parameters:
     TableName:
       Type: String
-      Default: SESNotifications
+      Default: LambdaMailerSESNotifications
       Description: The name of the dynamodb table
     PartitionKey:
       Type: String
@@ -114,4 +120,3 @@ resources:
       Type: Number
 
   Resources: ${file(infrastructure/bounce-table_cfn.yml):Resources}
-

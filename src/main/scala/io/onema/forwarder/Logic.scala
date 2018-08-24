@@ -11,6 +11,7 @@
 
 package io.onema.forwarder
 
+import com.amazonaws.services.lambda.runtime.events.ScheduledEvent
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.typesafe.scalalogging.Logger
 import io.onema.forwarder.Logic.{EmailMessage, SesMessage}
