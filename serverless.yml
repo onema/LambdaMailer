@@ -105,11 +105,11 @@ resources:
       Default: DestinationAddress
       Description: The name of the secondary index
     ReadCapacityUnits:
-      Default: 5
+      Default: 1
       Description: Dynamo read capacity units
       Type: Number
     WriteCapacityUnits:
-      Default: 5
+      Default: 1
       Description: Dynamo write capacity units
       Type: Number
 
