@@ -8,12 +8,12 @@ lazy val root = (project in file("."))
 
   version := "0.3.0",
 
-  scalaVersion := "2.12.5",
+  scalaVersion := "2.12.6",
 
   libraryDependencies ++= {
     Seq(
       // Serverless Base!
-//      "io.onema"                  % "serverless-base_2.12"      % "0.8.0",
+      "io.onema"                  % "userverless_2.12"      % "0.0.1",
 
       // AWS Clients
       "com.amazonaws"             % "aws-java-sdk-ses"          % "1.11.271",
@@ -29,10 +29,10 @@ lazy val root = (project in file("."))
     )
   }
 )
-.dependsOn(serverlessBase)
+//.dependsOn(uServerless)
 
 // Sub-projects
-lazy val serverlessBase = RootProject(file("../ServerlessBase"))
+//lazy val uServerless = RootProject(file("../uServerless"))
 
 // Assembly
 assemblyJarName in assembly := "app.jar"
