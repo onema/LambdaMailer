@@ -16,48 +16,25 @@ provider:
   profile: ${opt:profile, 'default'}
   timeout: 30
   versionFunctions: false
-
-
-# you can overwrite defaults here
+  memorySize: 1024
   stage: dev
   region: us-east-1
 
-# you can add statements to the Lambda function's IAM Role here
-  iamRoleStatements:
-    - Effect: "Allow"
-      Action:
-        - sns:Publish
-      Resource:
-        - "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
-        - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-topic"
-        - "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
-    - Effect: Allow
-      Action:
-        - dynamodb:PutItem
-        - dynamodb:GetItem
-        - dynamodb:Query
-      Resource:
-        - Fn::GetAtt: [ DynamoDBTable, Arn ]
-        - Fn::Join: ["/", [ Fn::GetAtt: [DynamoDBTable, Arn], "index", "*"]]
-    - Effect: Allow
-      Action:
-        - ses:SendEmail
-        - ses:SendRawEmail
-      Resource:
-        - "*"
+  # you can add statements to the Lambda function's IAM Role here
+  iamRoleStatements: ${file(infrastructure/global-values.yml):iamRoleStatements}
 
-# you can define service wide environment variables here
+  # Service wide environment variables
   environment:
     STAGE_NAME: ${self:custom.stageName}
     LOG_EMAIL: false
-    SNS_ERROR_TOPIC:
-      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId","${self:custom.stageName}-error-topic"]]
     SNS_MAILER_TOPIC:
       Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
 
+    # The error topic is part of the bootstrap infrastructure for uServerless
+    SNS_ERROR_TOPIC: ${file(infrastructure/global-values.yml):environment.SNS_ERROR_TOPIC}
+
 # Custom values. These can be referenced in the Cloud Formation template
-custom:
-  stageName: ${opt:stage, self:provider.stage}
+custom: ${file(infrastructure/global-values.yml):custom}
 
 # you can add packaging information here
 # Make sure to run "sbt assembly" to create a jar file
@@ -70,6 +47,7 @@ functions:
   # functions
   mailer-bounce:
     handler: io.onema.bounce.Function::lambdaHandler
+    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       TABLE_NAME:
         Ref: TableName
@@ -78,6 +56,7 @@ functions:
 
   mailer:
     handler: io.onema.mailer.Function::lambdaHandler
+    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       TABLE_NAME:
         Ref: TableName
@@ -86,37 +65,14 @@ functions:
 
   forwarder:
     handler: io.onema.forwarder.Function::lambdaHandler
-#    environment:
+    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
+
+    #    environment:
 #      EMAIL_MAPPING: "foo@bar.com=baz@balh.com,baz1@balh.com&foo2@bar.com=blah@balh.com"
     events:
       - sns: ${self:custom.stageName}-mail-forwarder
 
 # you can add CloudFormation resource templates here
 resources:
-  Parameters:
-    TableName:
-      Type: String
-      Default: LambdaMailerSESNotifications
-      Description: The name of the dynamodb table
-    PartitionKey:
-      Type: String
-      Default: MessageId
-      Description: The name of the main parition key
-    SortKey:
-      Type: String
-      Default: SnsPublishTime
-      Description: The name of the primary sort key
-    SecondaryIndex:
-      Type: String
-      Default: DestinationAddress
-      Description: The name of the secondary index
-    ReadCapacityUnits:
-      Default: 1
-      Description: Dynamo read capacity units
-      Type: Number
-    WriteCapacityUnits:
-      Default: 1
-      Description: Dynamo write capacity units
-      Type: Number
-
+  Parameters: ${file(infrastructure/bounce-table_cfn.yml):Parameters}
   Resources: ${file(infrastructure/bounce-table_cfn.yml):Resources}
