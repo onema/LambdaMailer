@@ -66,9 +66,8 @@ functions:
   forwarder:
     handler: io.onema.forwarder.Function::lambdaHandler
     onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
-
-    #    environment:
-#      EMAIL_MAPPING: "foo@bar.com=baz@balh.com,baz1@balh.com&foo2@bar.com=blah@balh.com"
+    environment:
+      EMAIL_MAPPING: ${env:EMAIL_MAPPING}
     events:
       - sns: ${self:custom.stageName}-mail-forwarder
 

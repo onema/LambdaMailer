@@ -11,11 +11,16 @@
 
 package io.onema.forwarder
 
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent
+import java.io.ByteArrayInputStream
+import java.util.Properties
+
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.typesafe.scalalogging.Logger
 import io.onema.forwarder.Logic.{EmailMessage, SesMessage}
 import io.onema.json.Extensions._
+import javax.mail.Session
+import javax.mail.internet.MimeMessage
+import org.apache.commons.mail.util.MimeMessageParser
 
 object Logic {
   case class SesMessage(notificationType: String, mail: Mail, receipt: Receipt, content: String)
@@ -64,21 +69,24 @@ class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
     resultingForwardingEmails.foreach(x => {
       val from = x._1
       val toEmails = x._2
+      val parser = parseMessage(message.content)
       toEmails.foreach(to => {
         log.debug(s"FROM: $from TO: $to REPLY-TO: $replyTo ORIGIN: $origin")
-        val rawContent = message.content
-
-          // Replace all the origin email address with the new from address
-          .replaceFirst("[Rr]eply-[Tt]o: .+(\\r\\n)", "")
-          .replaceFirst(s"From: .+(\\r\\n)", s"From: $from\r\nReply-To: $replyTo\r\n")
-          .replaceAll(s"Return-Path: .+(\\r\\n)", s"Return-Path: <$from>\r\n")
-          .replaceAll(s"(envelope-from=$origin)", s"envelope-from=$from")
-
-        val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo, raw = true).asJson
+        val rawContent = if(parser.hasHtmlContent) parser.getHtmlContent else parser.getPlainContent
+        val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo).asJson
         log.debug(s"Json Message: $emailMessage")
         snsClient.publish(mailerTopic, emailMessage)
       })
     })
+  }
+
+
+  private def parseMessage(content: String): MimeMessageParser = {
+    val s = Session.getInstance(new Properties())
+    val is = new ByteArrayInputStream(content.getBytes)
+    val mimeMessage = new MimeMessage(s, is)
+    val parser = new MimeMessageParser(mimeMessage)
+    parser.parse()
   }
 
   private def parseEmailMapping(mapping: String): Map[String, Seq[String]] = {

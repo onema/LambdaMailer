@@ -30,5 +30,4 @@ class ModelSerializationTest extends FlatSpec with Matchers {
     sesMessage.mail.source should be ("test@foobar.com")
   }
 
-  "Input stream serialization"
 }

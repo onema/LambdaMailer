@@ -16,8 +16,8 @@ import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import com.amazonaws.services.sns.AmazonSNSAsyncClientBuilder
 import io.onema.forwarder.Logic.SesMessage
 import io.onema.json.Extensions._
-import io.onema.serverlessbase.configuration.lambda.EnvLambdaConfiguration
-import io.onema.serverlessbase.function.LambdaHandler
+import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
+import io.onema.userverless.function.LambdaHandler
 
 import scala.collection.JavaConverters._
 
