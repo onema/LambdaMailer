@@ -6,15 +6,21 @@
   *
   * copyright (c) 2018, Juan Manuel Torres (http://onema.io)
   *
-  * @author Juan Manuel Torres <kinojman@gmail.com>
+  * @author Juan Manuel Torres <software@onema.io>
   */
 
 package io.onema.forwarder
+
+import java.io.ByteArrayInputStream
+import java.util.Properties
 
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.typesafe.scalalogging.Logger
 import io.onema.forwarder.Logic.{EmailMessage, SesMessage}
 import io.onema.json.Extensions._
+import javax.mail.Session
+import javax.mail.internet.MimeMessage
+import org.apache.commons.mail.util.MimeMessageParser
 
 object Logic {
   case class SesMessage(notificationType: String, mail: Mail, receipt: Receipt, content: String)
@@ -54,30 +60,44 @@ class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
   //--- Methods ---
   def handleRequest(message: SesMessage, emailMapping: String): Unit = {
     log.debug(s"Mailer Topic: $mailerTopic")
+
+    // The email mapping will get us all the addresses associated with the forwarder address
     val allowedForwardingEmailMapping = parseEmailMapping(emailMapping)
     val resultingForwardingEmails = getForwardingEmailAddresses(message.mail.destination, allowedForwardingEmailMapping)
-    val subject = message.mail.commonHeaders.subject
-    val replyTo = message.mail.commonHeaders.from.head
-    val origin = message.mail.source
+
+    // Extract values from the message
+    val (subject, replyTo, origin, parser) = getMessageValues(message)
+
+    // iterate over each mapped address and forward the email
     log.debug(resultingForwardingEmails.toString())
-    resultingForwardingEmails.foreach(x => {
-      val from = x._1
-      val toEmails = x._2
+    resultingForwardingEmails.foreach{case (from, toEmails) =>
       toEmails.foreach(to => {
         log.debug(s"FROM: $from TO: $to REPLY-TO: $replyTo ORIGIN: $origin")
-        val rawContent = message.content
-
-          // Replace all the origin email address with the new from address
-          .replaceFirst("Reply-to: .+(\\r\\n)", "")
-          .replaceFirst(s"From: .+(\\r\\n)", s"From: $from\r\nReply-To: $replyTo\r\n")
-          .replaceAll(s"Return-Path: .+(\\r\\n)", s"Return-Path: <$from>\r\n")
-          .replaceAll(s"(envelope-from=$origin)", s"envelope-from=$from")
-
-        val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo, raw = true).asJson
+        val rawContent = if(parser.hasHtmlContent) parser.getHtmlContent else parser.getPlainContent
+        val emailMessage = EmailMessage(Seq(to), from, subject, rawContent, replyTo).asJson
         log.debug(s"Json Message: $emailMessage")
         snsClient.publish(mailerTopic, emailMessage)
       })
-    })
+    }
+  }
+
+  private def parseMessage(content: String): MimeMessageParser = {
+    val s = Session.getInstance(new Properties())
+    val is = new ByteArrayInputStream(content.getBytes)
+    val mimeMessage = new MimeMessage(s, is)
+    val parser = new MimeMessageParser(mimeMessage)
+    parser.parse()
+  }
+
+  private def getMessageValues(message: SesMessage): (String, String, String, MimeMessageParser) = {
+    (
+      message.mail.commonHeaders.subject,
+      message.mail.commonHeaders.from.head,
+      message.mail.source,
+
+      // Parse the raw message using Apache commons
+      parseMessage(message.content)
+    )
   }
 
   private def parseEmailMapping(mapping: String): Map[String, Seq[String]] = {
@@ -96,4 +116,3 @@ class Logic(val snsClient: AmazonSNSAsync, val mailerTopic: String) {
     else throw new Exception(s"The destination emails $destination, do not contain a valid mapping in the configuration. Received $destination, allowed $allowedForwardingEmailMapping")
   }
 }
-

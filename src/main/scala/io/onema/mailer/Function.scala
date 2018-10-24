@@ -6,43 +6,37 @@
   *
   * copyright (c) 2018, Juan Manuel Torres (http://onema.io)
   *
-  * @author Juan Manuel Torres <kinojman@gmail.com>
+  * @author Juan Manuel Torres <software@onema.io>
   */
 
 package io.onema.mailer
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClientBuilder
-import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
 import io.onema.json.JavaExtensions._
-import io.onema.serverlessbase.configuration.lambda.EnvLambdaConfiguration
-import io.onema.serverlessbase.function.LambdaHandler
+import io.onema.mailer.Logic.Email
+import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
+import io.onema.userverless.function.SnsHandler
 
-import scala.collection.JavaConverters._
-
-class Function extends LambdaHandler[Unit] with EnvLambdaConfiguration {
+class Function extends SnsHandler[Email] with EnvLambdaConfiguration {
 
   //--- Fields ---
-  override protected val snsClient: AmazonSNSAsync = AmazonSNSAsyncClientBuilder.defaultClient()
-
   val logic = new Logic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
-    "SESNotifications",
+    getValue("/table/name").getOrElse("LambdaMailerSESNotifications"),
     logEmail
   )
 
   //--- Methods ---
-  def lambdaHandler(event: SNSEvent, context: Context): Unit = {
-    log.info(event.asJson)
-    val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
-    handle(logic.handleRequest(snsRecord))
+  def execute(email: Email, context: Context): Unit = {
+    log.info(email.asJson)
+    logic.handleRequest(email)
   }
 
   private def logEmail = {
     val shouldLog = getValue("/log/email")
-    if(shouldLog.isDefined && shouldLog.get.toLowerCase() == "true") true else false
+    if(shouldLog.isDefined && shouldLog.getOrElse("").toLowerCase() == "true") true else false
   }
 }

@@ -6,7 +6,7 @@
 #
 # copyright (c) 2018, Juan Manuel Torres (http://onema.io)
 #
-# @author Juan Manuel Torres <kinojman@gmail.com>
+# @author Juan Manuel Torres <software@onema.io>
 #
 service: lambda-mailer
 
@@ -16,48 +16,24 @@ provider:
   profile: ${opt:profile, 'default'}
   timeout: 30
   versionFunctions: false
-
-
-# you can overwrite defaults here
+  memorySize: 1024
   stage: dev
   region: us-east-1
 
-# you can add statements to the Lambda function's IAM Role here
-  iamRoleStatements:
-    - Effect: "Allow"
-      Action:
-        - sns:Publish
-      Resource:
-        - "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
-        - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-error-topic"
-        - "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
-    - Effect: Allow
-      Action:
-        - dynamodb:PutItem
-        - dynamodb:GetItem
-        - dynamodb:Query
-      Resource:
-        - Fn::GetAtt: [ DynamoDBTable, Arn ]
-        - Fn::Join: ["/", [ Fn::GetAtt: [DynamoDBTable, Arn], "index", "*"]]
-    - Effect: Allow
-      Action:
-        - ses:SendEmail
-        - ses:SendRawEmail
-      Resource:
-        - "*"
+  # you can add statements to the Lambda function's IAM Role here
+  iamRoleStatements: ${file(infrastructure/global-values.yml):iamRoleStatements}
 
-# you can define service wide environment variables here
+  # Service wide environment variables
   environment:
     STAGE_NAME: ${self:custom.stageName}
-    LOG_EMAIL: false
-    SNS_ERROR_TOPIC:
-      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId","${self:custom.stageName}-bounce-error-topic"]]
     SNS_MAILER_TOPIC:
       Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
 
+    # The error topic is part of the bootstrap infrastructure for uServerless
+    SNS_ERROR_TOPIC: ${file(infrastructure/global-values.yml):environment.SNS_ERROR_TOPIC}
+
 # Custom values. These can be referenced in the Cloud Formation template
-custom:
-  stageName: ${opt:stage, self:provider.stage}
+custom: ${file(infrastructure/global-values.yml):custom}
 
 # you can add packaging information here
 # Make sure to run "sbt assembly" to create a jar file
@@ -70,48 +46,32 @@ functions:
   # functions
   mailer-bounce:
     handler: io.onema.bounce.Function::lambdaHandler
+    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
+    environment:
+      TABLE_NAME:
+        Ref: TableName
     events:
       - sns: ${self:custom.stageName}-mailer-bounce
 
   mailer:
     handler: io.onema.mailer.Function::lambdaHandler
+    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
+    environment:
+      LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
+      TABLE_NAME:
+        Ref: TableName
     events:
       - sns: ${self:custom.stageName}-mailer
 
   forwarder:
     handler: io.onema.forwarder.Function::lambdaHandler
-#    environment:
-#      EMAIL_MAPPING: "foo@bar.com=baz@balh.com,baz1@balh.com&foo2@bar.com=blah@balh.com"
+    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
+    environment:
+      EMAIL_MAPPING: ${env:EMAIL_MAPPING}
     events:
       - sns: ${self:custom.stageName}-mail-forwarder
 
 # you can add CloudFormation resource templates here
 resources:
-  Parameters:
-    TableName:
-      Type: String
-      Default: SESNotifications
-      Description: The name of the dynamodb table
-    PartitionKey:
-      Type: String
-      Default: MessageId
-      Description: The name of the main parition key
-    SortKey:
-      Type: String
-      Default: SnsPublishTime
-      Description: The name of the primary sort key
-    SecondaryIndex:
-      Type: String
-      Default: DestinationAddress
-      Description: The name of the secondary index
-    ReadCapacityUnits:
-      Default: 5
-      Description: Dynamo read capacity units
-      Type: Number
-    WriteCapacityUnits:
-      Default: 5
-      Description: Dynamo write capacity units
-      Type: Number
-
+  Parameters: ${file(infrastructure/bounce-table_cfn.yml):Parameters}
   Resources: ${file(infrastructure/bounce-table_cfn.yml):Resources}
-

@@ -1,12 +1,13 @@
 LambdaMailer
 ============
+[![LICENSE](https://img.shields.io/badge/license-Apache--2.0-blue.svg?longCache=true&style=flat-square)](LICENSE)
 
 Description
 -----------
 
 Serverless application to send emails using SES and Lambda.
 
-The project defines two lambda functions and a dynamodb table to keep track of bounces and complaints
+The project defines three lambda functions (mailer, bouce, and forwarder) and a dynamodb table to keep track of bounces and complaints.
 
 ![Serverless Lambda Mailer](docs/img/ServerlessLambdaMailer.png)
 
@@ -26,11 +27,12 @@ a JSON object with the following format:
 
 | Field     | type         | description                                                                                 |
 |-----------|--------------|---------------------------------------------------------------------------------------------|
-| `to`      | List\[String\] | A list of valid email addresses                                                             |
+| `to`      | List\[String\] | A list of valid email addresses                                                           |
 | `from`    | String       | Email address that will be use to send the email, this must be an approved email or domain. |
 | `subject` | String       | The subject of the email                                                                    |
 | `body`    | String       | HTML or Plain Text body of the email                                                        |
 | `replyTo` | String       | The reply-to email address, can be different from the `from` email                          |
+| `raw`     | Boolean      | Specifies weather the body of the email is a raw email message (true) or text/html (false)  |
 
 
 The mailer will check each email address against the bounce dynamodb table to prevent sending emails to

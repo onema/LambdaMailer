@@ -6,7 +6,7 @@
   *
   * copyright (c) 2018, Juan Manuel Torres (http://onema.io)
   *
-  * @author Juan Manuel Torres <kinojman@gmail.com>
+  * @author Juan Manuel Torres <software@onema.io>
   */
 
 package io.onema.mailer
@@ -17,11 +17,9 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec
 import com.amazonaws.services.dynamodbv2.document.utils.ValueMap
 import com.amazonaws.services.dynamodbv2.document.{DynamoDB, ItemCollection, QueryOutcome}
-import com.amazonaws.services.lambda.runtime.events.SNSEvent.SNS
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService
 import com.amazonaws.services.simpleemail.model._
 import com.typesafe.scalalogging.Logger
-import io.onema.json.Extensions._
 import io.onema.mailer.Logic.Email
 
 import scala.collection.JavaConverters._
@@ -66,8 +64,7 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
   private val table = dynamoDb.getTable(tableName)
 
   //--- Methods ---
-  def handleRequest(snsRecord: SNS): Unit = {
-    val email = snsRecord.getMessage.jsonDecode[Email]
+  def handleRequest(email: Email): Unit = {
     val filteredEmails = email.copy(to = email.to.filter(isNotBlocked))
 
     if(filteredEmails.to.nonEmpty) {
@@ -91,7 +88,7 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
   def isNotBlocked(destinationAddress: String): Boolean = {
     Try(findEmail(destinationAddress)) match {
       case Success(response) =>
-        log.info("Successfully query the event table")
+        log.info("Successfully query the sesMessage table")
 
         // If it does find any items in the table, the address is not blocked
         !response.iterator().hasNext
