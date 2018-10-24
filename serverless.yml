@@ -26,7 +26,6 @@ provider:
   # Service wide environment variables
   environment:
     STAGE_NAME: ${self:custom.stageName}
-    LOG_EMAIL: false
     SNS_MAILER_TOPIC:
       Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
 
@@ -58,6 +57,7 @@ functions:
     handler: io.onema.mailer.Function::lambdaHandler
     onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
+      LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
       TABLE_NAME:
         Ref: TableName
     events:

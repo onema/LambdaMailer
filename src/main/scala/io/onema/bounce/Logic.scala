@@ -13,9 +13,8 @@ package io.onema.bounce
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.dynamodbv2.model.{AttributeValue, PutItemResult}
-import com.amazonaws.services.lambda.runtime.events.SNSEvent.SNS
 import com.typesafe.scalalogging.Logger
-import io.onema.bounce.Logic.SnsNotification
+import io.onema.bounce.Logic.SesNotification
 import io.onema.json.Extensions._
 
 import scala.collection.JavaConverters._
@@ -23,7 +22,7 @@ import scala.util.{Failure, Success, Try}
 
 
 object Logic {
-  case class SnsNotification(notificationType: String = "", bounce: Bounce = Bounce(), complaint: Complaint = Complaint(), mail: Mail = Mail())
+  case class SesNotification(notificationType: String = "", bounce: Bounce = Bounce(), complaint: Complaint = Complaint(), mail: Mail = Mail())
   case class Bounce(
     bounceType: String = "",
     bounceSubType: String = "",
@@ -66,12 +65,7 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
   protected val log = Logger("bounce-logic")
 
   //--- Methods ---
-  def handleRequest(snsRecord: SNS): Unit = {
-    val snsPublishTime = snsRecord.getTimestamp.toString("yyyy-MM-dd'T'HH:mm:ss'Z'")
-    val snsTopicArn = snsRecord.getTopicArn
-    val sesMessage = snsRecord.getMessage.jsonDecode[SnsNotification]
-    val sesMessageId = sesMessage.mail.messageId
-
+  def handleRequest(snsPublishTime: String, sesMessageId: String, sesMessage: SesNotification): Unit = {
     if(sesMessage.notificationType == "Bounce") {
       val sesDestinationAddresses = sesMessage.bounce.bouncedRecipients
       val reportingMta = sesMessage.bounce.reportingMTA
@@ -93,7 +87,7 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
   def tryPutBounceRecord(messageId: String, publishTime: String, reportingMTA: String, destinationAddress: String, summary: String, messageType: String): Unit = {
     Try(recordBounce(messageId, publishTime, reportingMTA, destinationAddress, summary, messageType)) match {
       case Success(response) =>
-        log.info("Successfully recorded bounce event")
+        log.info("Successfully recorded bounce sesMessage")
       case Failure(ex) =>
         log.error("Unable to write bounce record")
         throw ex
@@ -102,7 +96,7 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
   def tryPutComplaintRecord(messageId: String, publishTime: String, feedbackId: String, sesDestinationAddress: String, feedbackType: String): Unit = {
     Try(recordComplaint(messageId, publishTime, feedbackId, sesDestinationAddress, feedbackType)) match {
       case Success(response) =>
-        log.info("Successful recorded complaint event")
+        log.info("Successful recorded complaint sesMessage")
       case Failure(ex) =>
         log.error("Unable to write complaint record")
         throw ex

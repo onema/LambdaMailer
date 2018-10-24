@@ -14,6 +14,7 @@ package io.onema.bounce
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
+import io.onema.bounce.Logic.SesNotification
 import io.onema.json.JavaExtensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.LambdaHandler
@@ -32,6 +33,9 @@ class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration
   override def execute(event: SNSEvent, context: Context): Unit = {
     log.info(event.asJson)
     val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
-    logic.handleRequest(snsRecord)
+    val snsPublishTime = snsRecord.getTimestamp.toString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    val sesMessage = snsRecord.getMessage.jsonDecode[SesNotification]
+    val sesMessageId = sesMessage.mail.messageId
+    logic.handleRequest(snsPublishTime, sesMessageId, sesMessage)
   }
 }

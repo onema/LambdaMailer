@@ -13,15 +13,13 @@ package io.onema.mailer
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClientBuilder
 import io.onema.json.JavaExtensions._
+import io.onema.mailer.Logic.Email
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
-import io.onema.userverless.function.LambdaHandler
+import io.onema.userverless.function.SnsHandler
 
-import scala.collection.JavaConverters._
-
-class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
+class Function extends SnsHandler[Email] with EnvLambdaConfiguration {
 
   //--- Fields ---
   val logic = new Logic(
@@ -32,14 +30,13 @@ class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration
   )
 
   //--- Methods ---
-  def execute(event: SNSEvent, context: Context): Unit = {
-    log.info(event.asJson)
-    val snsRecord: SNSEvent.SNS = event.getRecords.asScala.head.getSNS
-    handle(logic.handleRequest(snsRecord))
+  def execute(email: Email, context: Context): Unit = {
+    log.info(email.asJson)
+    logic.handleRequest(email)
   }
 
   private def logEmail = {
     val shouldLog = getValue("/log/email")
-    if(shouldLog.isDefined && shouldLog.get.toLowerCase() == "true") true else false
+    if(shouldLog.isDefined && shouldLog.getOrElse("").toLowerCase() == "true") true else false
   }
 }
