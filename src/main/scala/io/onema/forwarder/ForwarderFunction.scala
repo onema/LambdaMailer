@@ -18,7 +18,7 @@ import io.onema.json.Extensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.SnsHandler
 
-class Function extends SnsHandler[SesMessage] with EnvLambdaConfiguration {
+class ForwarderFunction extends SnsHandler[SesMessage] with EnvLambdaConfiguration {
 
   //--- Fields ---
   val logic = new Logic(snsClient = AmazonSNSAsyncClientBuilder.defaultClient(), mailerTopic = getValue("sns/mailer/topic").get)

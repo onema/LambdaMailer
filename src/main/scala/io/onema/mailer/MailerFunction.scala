@@ -19,7 +19,7 @@ import io.onema.mailer.Logic.Email
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.SnsHandler
 
-class Function extends SnsHandler[Email] with EnvLambdaConfiguration {
+class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
 
   //--- Fields ---
   val logic = new Logic(
