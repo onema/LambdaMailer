@@ -6,14 +6,14 @@ lazy val root = (project in file("."))
 
   name := "lambda-mailer",
 
-  version := "0.4.1",
+  version := "0.4.2",
 
   scalaVersion := "2.12.7",
 
   libraryDependencies ++= {
     Seq(
       // dependencies
-      "io.onema"                  % "userverless_2.12"      % "0.0.8",
+      "io.onema"                  % "userverless_2.12"      % "0.0.9",
       "org.apache.commons"        % "commons-email"         % "1.5",
 
         // AWS Clients

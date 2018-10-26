@@ -16,7 +16,7 @@ provider:
   profile: ${opt:profile, 'default'}
   timeout: 30
   versionFunctions: false
-  memorySize: 1024
+  memorySize: 512
   stage: dev
   region: us-east-1
 
@@ -45,7 +45,7 @@ functions:
 
   # functions
   mailer-bounce:
-    handler: io.onema.bounce.Function::lambdaHandler
+    handler: io.onema.bounce.BounceFunction::lambdaHandler
     onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       TABLE_NAME:
@@ -54,7 +54,7 @@ functions:
       - sns: ${self:custom.stageName}-mailer-bounce
 
   mailer:
-    handler: io.onema.mailer.Function::lambdaHandler
+    handler: io.onema.mailer.MailerFunction::lambdaHandler
     onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
@@ -64,7 +64,7 @@ functions:
       - sns: ${self:custom.stageName}-mailer
 
   forwarder:
-    handler: io.onema.forwarder.Function::lambdaHandler
+    handler: io.onema.forwarder.ForwarderFunction::lambdaHandler
     onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       EMAIL_MAPPING: ${env:EMAIL_MAPPING}

@@ -15,13 +15,13 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import io.onema.bounce.Logic.SesNotification
-import io.onema.json.JavaExtensions._
+import io.onema.json.Extensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.LambdaHandler
 
 import scala.collection.JavaConverters._
 
-class Function extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
+class BounceFunction extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
   val logic = new Logic(
