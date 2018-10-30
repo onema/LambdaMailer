@@ -20,7 +20,8 @@ a JSON object with the following format:
     "from": "info@mailer.mydomain.com",
     "subject": "test01",
     "body": "<h1>Test Body</h1>",
-    "replyTo": "no-reply@mailer.mydomain.com"
+    "replyTo": "no-reply@mailer.mydomain.com",
+    "raw": false
 }
 ```
 
@@ -72,7 +73,7 @@ Use the [serverless framework](https://serverless.com/) to install this project:
 serverless deploy --stage dev
 ```
 
-### Enable bounce and complaint blocking
+## Enable bounce and complaint blocking
 The lambda mailer defines a lambda function that adds bounce and complaint email addresses
 to a dynamodb table.
 

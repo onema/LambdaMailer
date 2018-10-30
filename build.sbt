@@ -1,4 +1,4 @@
-resolvers += "Onema Snapshots" at "s3://s3-us-east-1.amazonaws.com/ones-deployment-bucket/snapshots"
+//resolvers += "Onema Snapshots" at "s3://s3-us-east-1.amazonaws.com/ones-deployment-bucket/snapshots"
 
 lazy val root = (project in file("."))
 .settings(
@@ -6,14 +6,14 @@ lazy val root = (project in file("."))
 
   name := "lambda-mailer",
 
-  version := "0.4.3",
+  version := "0.5.0",
 
   scalaVersion := "2.12.7",
 
   libraryDependencies ++= {
     Seq(
       // dependencies
-      "io.onema"                  % "userverless_2.12"      % "0.0.10",
+      "io.onema"                  % "userverless-core_2.12" % "0.0.1",
       "org.apache.commons"        % "commons-email"         % "1.5",
 
         // AWS Clients
