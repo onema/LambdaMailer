@@ -5,7 +5,7 @@ LambdaMailer
 Description
 -----------
 
-Serverless application to send emails using SES and Lambda.
+Serverless application to send emails using SES, lambda and Scala.
 
 The project defines three lambda functions (mailer, bouce, and forwarder) and a dynamodb table to keep track of bounces and complaints.
 
@@ -74,13 +74,6 @@ Use the [serverless framework](https://serverless.com/) to install this project:
 serverless deploy --stage dev
 ```
 
-I have provided a simple shell script to help you deploy this project
-```bash
-./build deploy dev
-```
-
-This will compile, create the assembly and deploy the package to lambda
-
 ### Enable bounce and complaint blocking
 The lambda mailer defines a lambda function that adds bounce and complaint email addresses
 to a dynamodb table.
@@ -94,5 +87,5 @@ Save Config, and you are done!
 Uninstall
 ---------
 ```bash
-./build remove dev
+serverless remove 
 ```
