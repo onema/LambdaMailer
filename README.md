@@ -2,10 +2,9 @@ LambdaMailer
 ============
 [![LICENSE](https://img.shields.io/badge/license-Apache--2.0-blue.svg?longCache=true&style=flat-square)](LICENSE)
 
-Description
------------
-
-Serverless application to send emails using SES, lambda and Scala.
+## Description
+LambdaMailer is a simple Serverless mailing system for AWS SES build on [µServerless](https://github.com/onema/uServerless) and [Scala](https://www.scala-lang.org/)
+and deployed using the [serverless framework](https://serverless.com).
 
 The project defines three lambda functions (mailer, bouce, and forwarder) and a dynamodb table to keep track of bounces and complaints.
 
@@ -61,8 +60,7 @@ spam@example.com=my.rea.email@gmail.com,anotheremail@yahoo.com&foobar@example2.c
 ```
 and it must be assigned to the `EMAIL_MAPPING` environment variable. 
 
-Installation
-------------
+## Installation
 You must build the project before it is deployed using SBT:
 ```bash
 sbt compile
@@ -84,8 +82,7 @@ Under edit configuration select the `<STAGE>-mailer-bounce` SNS Topic for both B
 
 Save Config, and you are done!
 
-Uninstall
----------
+## Uninstall
 ```bash
 serverless remove 
 ```
