@@ -12,26 +12,40 @@
 package io.onema.forwarder
 
 import com.amazonaws.services.lambda.runtime.Context
-import com.amazonaws.services.sns.AmazonSNSAsyncClientBuilder
-import io.onema.forwarder.Logic.SesMessage
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.sns.AmazonSNSClientBuilder
+import io.onema.forwarder.ForwarderLogic.SesEvent
 import io.onema.json.Extensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
-import io.onema.userverless.function.SnsHandler
+import io.onema.userverless.function.Extensions._
+import io.onema.userverless.function.LambdaHandler
 
-class ForwarderFunction extends SnsHandler[SesMessage] with EnvLambdaConfiguration {
+class ForwarderFunction extends LambdaHandler[SesEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
-  val logic = new Logic(snsClient = AmazonSNSAsyncClientBuilder.defaultClient(), mailerTopic = getValue("sns/mailer/topic").get)
+  val logic = new ForwarderLogic(
+    snsClient = AmazonSNSClientBuilder.defaultClient(),
+    mailerTopic = getValue("sns/mailer/topic").get,
+    s3Client = AmazonS3ClientBuilder.defaultClient(),
+    bucketName = getValue("forwarder/s3/bucket").get
+  )
 
   //--- Methods ---
-  def execute(sesMessage: SesMessage, context: Context): Unit = {
-    val accountId = context.getInvokedFunctionArn.split(':')(4)
+  def execute(sesEvent: SesEvent, context: Context): Unit = {
+    val accountId = context.accountId
     val region = getValue("aws/region").get
 
     // Get an email mapping like "foo@bar.com=baz@balh.com,baz1@balh.com&foo2@bar.com=blah@balh.com"
     // and parse it into a dictionary of [sender, recipients] where the recipients are a sequence of strings
     val emailMapping = getValue("email/mapping")
-    log.debug(sesMessage.asJson)
-    logic.handleRequest(sesMessage, emailMapping.getOrElse(""))
+    sesEvent.records.foreach(r => {
+      val sesMessage = r.ses
+      log.debug(sesMessage.asJson)
+      logic.handleRequest(sesMessage, emailMapping.getOrElse(""))
+    })
+  }
+
+  override def jsonDecode(json: String): SesEvent = {
+    json.jsonDecode[SesEvent](ForwarderLogic.fieldRenames)
   }
 }
