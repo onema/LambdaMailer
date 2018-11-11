@@ -23,6 +23,10 @@ Parameters:
     Default: 1
     Description: Dynamo write capacity units
     Type: Number
+  StageName:
+    Default: "${self:custom.stageName}"
+    Description: The name of the current stage
+    Type: String
 
 Resources:
 
@@ -73,8 +77,46 @@ Resources:
         AttributeName: ExpirationTime
         Enabled: true
 
+  ForwarderS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 30
+            Id: delete-after-30-days
+            Status: Enabled
+  ForwarderS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: ForwarderS3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: GiveSESPermissionToWriteEmail
+            Effect: Allow
+            Principal:
+              Service: "ses.amazonaws.com"
+            Action: s3:PutObject
+            Resource:
+              Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
+            Condition:
+              StringEquals:
+                aws:Referer:
+                  Ref: AWS::AccountId
+
+
 Outputs:
-  EventsJsonArchive:
+  EmailBounceAndComplaintTable:
     Value:
       Ref: DynamoDBTable
 
+  ForwarderS3BucketArn:
+    Value:
+      Fn::GetAtt: [ForwarderS3Bucket, Arn]
+    Description: Name of S3 bucket to hold website content
+
+  ForwarderS3BucketName:
+    Value:
+      Ref: ForwarderS3Bucket
+    Description: Name of S3 bucket to hold website content

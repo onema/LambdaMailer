@@ -24,10 +24,16 @@ iamRoleStatements:
 
   - Effect: Allow
     Action:
-      - ssqs:SendMessageBatch
+      - sqs:SendMessageBatch
       - sqs:SendMessage
     Resource:
       - Fn::ImportValue: "${self:custom.stageName}-dead-letter-queue-arn"
+  - Effect: Allow
+    Action:
+      - s3:GetObject
+    Resource:
+      - Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
+      - Fn::GetAtt: [ForwarderS3Bucket, Arn]
 
 environment:
   SNS_ERROR_TOPIC:

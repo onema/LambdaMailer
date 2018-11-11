@@ -16,7 +16,7 @@ provider:
   profile: ${opt:profile, 'default'}
   timeout: 30
   versionFunctions: false
-  memorySize: 512
+  memorySize: 1024
   stage: dev
   region: us-east-1
 
@@ -31,6 +31,7 @@ provider:
 
     # The error topic is part of the bootstrap infrastructure for uServerless
     SNS_ERROR_TOPIC: ${file(infrastructure/global-values.yml):environment.SNS_ERROR_TOPIC}
+    LOG_LEVEL: DEBUG
 
 # Custom values. These can be referenced in the Cloud Formation template
 custom: ${file(infrastructure/global-values.yml):custom}
@@ -68,10 +69,13 @@ functions:
     onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       EMAIL_MAPPING: ${env:EMAIL_MAPPING}
-    events:
-      - sns: ${self:custom.stageName}-mail-forwarder
+      FORWARDER_S3_BUCKET:
+        Ref: ForwarderS3Bucket
+#    events:
+#      - sns: ${self:custom.stageName}-mail-forwarder
 
 # you can add CloudFormation resource templates here
 resources:
-  Parameters: ${file(infrastructure/bounce-table_cfn.yml):Parameters}
-  Resources: ${file(infrastructure/bounce-table_cfn.yml):Resources}
+  Parameters: ${file(infrastructure/mailer-resources_cfn.yml):Parameters}
+  Resources: ${file(infrastructure/mailer-resources_cfn.yml):Resources}
+  Outputs: ${file(infrastructure/mailer-resources_cfn.yml):Outputs}
