@@ -20,12 +20,13 @@ import com.amazonaws.services.dynamodbv2.document.{DynamoDB, ItemCollection, Que
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService
 import com.amazonaws.services.simpleemail.model._
 import com.typesafe.scalalogging.Logger
-import io.onema.mailer.Logic.Email
+import io.onema.mailer.MailerLogic.Email
+import net.logstash.logback.argument.StructuredArguments._
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-object Logic {
+object MailerLogic {
   case class Email(to: Seq[String], from: String, subject: String, body: String, replyTo: String = "", raw: Boolean = false) {
     lazy val request: SendEmailRequest = {
       val destination = new Destination().withToAddresses(to.asJava)
@@ -56,7 +57,7 @@ object Logic {
   }
 }
 
-class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val tableName: String, val shouldLogEmail: Boolean) {
+class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val tableName: String, val shouldLogEmail: Boolean) {
 
   //--- Fields ---
   protected val log = Logger("mailer-logic")
@@ -69,7 +70,7 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
 
     if(filteredEmails.to.nonEmpty) {
       val value = if(shouldLogEmail) filteredEmails.to else s"${filteredEmails.to.size} emails"
-      log.info(s"Sending email to $value")
+      log.info(s"Sending message to $value")
       sendEmail(filteredEmails)
     } else {
       log.info(s"All emails are blocked")
@@ -78,8 +79,10 @@ class Logic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonD
 
   def sendEmail(email: Email): Unit = {
     if(email.raw) {
+      log.debug("Sending raw email", keyValue("RAW-BODY", email.body))
       sesClient.sendRawEmail(email.rawRequest)
     } else {
+      log.debug("Sending plain email", keyValue("BODY", email.body))
       sesClient.sendEmail(email.request)
     }
     log.info("Email sent successfully")

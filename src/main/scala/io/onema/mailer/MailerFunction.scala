@@ -15,14 +15,14 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClientBuilder
 import io.onema.json.JavaExtensions._
-import io.onema.mailer.Logic.Email
+import io.onema.mailer.MailerLogic.Email
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.SnsHandler
 
 class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
 
   //--- Fields ---
-  val logic = new Logic(
+  val logic = new MailerLogic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
     getValue("/table/name").getOrElse("LambdaMailerSESNotifications"),
