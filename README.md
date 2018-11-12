@@ -50,7 +50,7 @@ You must subscribe the bounce and complaint notifications to the bounce. See the
 for more information.
 
 ### Lambda Mailer Forwarder
-The forwarder allows you to receive messages sent by a SES rule set via SNS. 
+The forwarder allows you to receive messages sent by a SES rule set. 
 
 The forwarder will receive emails sent to the given address and forward them to the associated email addresses.
 
@@ -60,6 +60,9 @@ The association is a mapping that has the following format:
 spam@example.com=my.rea.email@gmail.com,anotheremail@yahoo.com&foobar@example2.com=some@email.com
 ```
 and it must be assigned to the `EMAIL_MAPPING` environment variable. 
+
+In addition, you will need to set the forwarding email addresses in an active SES Rule Set.
+For more information see the installation instructions below.
 
 ## Installation
 You must build the project before it is deployed using SBT:
@@ -82,6 +85,18 @@ To enable bounce and complaint blocking go `SES` > `Domains` > `Notifications` >
 Under edit configuration select the `<STAGE>-mailer-bounce` SNS Topic for both Bounces and Complaints.
 
 Save Config, and you are done!
+
+## Enable email forwarding
+For the forwarder to work properly, you will need to create/edit the SES Rule Set after the application has been launched:
+1. Go to `SES` -> `Rule Set` -> `Vie Active Rule Set`
+1. Create or edit an existing Rule Set
+1. Add one or more verified recipients, these are email addresses to reach your forwarder, e.g. `spam@example.com`
+1. Add an action S3. Find or select the `lambda-mailer-dev-forwarders3bucket-XXXXXXXXXX` bucket. To find the exact name of the `S3 bucket`:
+    1. go to CloudFormation and select the `lambda-mailer-<STAGE>` stack
+    1. select the `Outputs` section and copy the value of the `ForwarderS3BucketName` which should look like `lambda-mailer-dev-forwarders3bucket-XXXXXXXXXX`
+1. Add a `Lambda` action and select the `lambda-mailer-<STAGE>-forwarder`
+1. Click on `Save Rule`
+1. In the Missing Permission pop-up click `Add permissions`
 
 ## Uninstall
 ```bash

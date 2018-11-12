@@ -114,9 +114,9 @@ Outputs:
   ForwarderS3BucketArn:
     Value:
       Fn::GetAtt: [ForwarderS3Bucket, Arn]
-    Description: Name of S3 bucket to hold website content
+    Description: ARN of S3 bucket for the forwarding email content
 
   ForwarderS3BucketName:
     Value:
       Ref: ForwarderS3Bucket
-    Description: Name of S3 bucket to hold website content
+    Description: Name of S3 bucket for the forwarding email content
