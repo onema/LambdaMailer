@@ -11,16 +11,17 @@ lazy val root = (project in file("."))
   scalaVersion := "2.12.7",
 
   libraryDependencies ++= {
-    val awsSdkVersion = "1.11.447"
+    val awsSdkVersion = "1.11.451"
     Seq(
       // dependencies
-      "io.onema"                  % "userverless-core_2.12" % "0.0.2",
+      "io.onema"                  % "userverless-core_2.12" % "0.0.3",
       "org.apache.commons"        % "commons-email"         % "1.5",
 
         // AWS Clients
       "com.amazonaws"             % "aws-java-sdk-ses"          % awsSdkVersion,
       "com.amazonaws"             % "aws-java-sdk-dynamodb"     % awsSdkVersion,
       "com.amazonaws"             % "aws-java-sdk-s3"           % awsSdkVersion,
+      "com.amazonaws"             % "aws-java-sdk-sns"          % awsSdkVersion,
 
       // Logging
       "com.typesafe.scala-logging"% "scala-logging_2.12"        % "3.7.2",

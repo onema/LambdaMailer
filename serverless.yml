@@ -30,7 +30,6 @@ provider:
       Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
 
     # The error topic is part of the bootstrap infrastructure for uServerless
-    SNS_ERROR_TOPIC: ${file(infrastructure/global-values.yml):environment.SNS_ERROR_TOPIC}
     LOG_LEVEL: DEBUG
 
 # Custom values. These can be referenced in the Cloud Formation template

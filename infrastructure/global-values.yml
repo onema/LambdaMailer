@@ -6,7 +6,6 @@ iamRoleStatements:
       - "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
       - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-topic"
       - "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
-      - Fn::ImportValue: "${self:custom.stageName}-error-topic-arn"
   - Effect: Allow
     Action:
       - dynamodb:PutItem
@@ -34,10 +33,6 @@ iamRoleStatements:
     Resource:
       - Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
       - Fn::GetAtt: [ForwarderS3Bucket, Arn]
-
-environment:
-  SNS_ERROR_TOPIC:
-    Fn::ImportValue: "${self:custom.stageName}-error-topic-arn"
 
 custom:
   stageName: ${opt:stage, self:provider.stage}
