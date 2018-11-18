@@ -22,21 +22,18 @@ import io.onema.userverless.function.SnsHandler
 class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
 
   //--- Fields ---
+  private val logEmail = getValue("/log/email")
+  private val shouldLog = if(logEmail.isDefined && logEmail.getOrElse("").toLowerCase() == "true") true else false
   val logic = new MailerLogic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
     getValue("/table/name").getOrElse("LambdaMailerSESNotifications"),
-    logEmail
+    shouldLog
   )
 
   //--- Methods ---
   def execute(email: Email, context: Context): Unit = {
     log.info(email.asJson)
     logic.handleRequest(email)
-  }
-
-  private def logEmail = {
-    val shouldLog = getValue("/log/email")
-    if(shouldLog.isDefined && shouldLog.getOrElse("").toLowerCase() == "true") true else false
   }
 }

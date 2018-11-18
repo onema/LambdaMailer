@@ -16,11 +16,13 @@ import java.util.Properties
 
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.sns.AmazonSNS
+import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
 import io.onema.forwarder.ForwarderLogic.SesMessage
 import io.onema.json.Extensions._
 import io.onema.mailer.MailerLogic.Email
-import javax.mail.internet.{InternetAddress, MimeMessage}
+import io.onema.userverless.monitoring.LogMetrics._
+import javax.mail.internet.InternetAddress
 import javax.mail.{Address, Message, Session}
 import net.logstash.logback.argument.StructuredArguments._
 import org.apache.commons.mail.util.MimeMessageParser
@@ -72,7 +74,7 @@ object ForwarderLogic {
   }
 }
 
-class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String) {
+class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String, logEmail: Boolean = false) {
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
@@ -92,45 +94,56 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     // iterate over each mapped address and forward the email
     resultingForwardingEmails.foreach{case (from, toEmails) =>
       toEmails.foreach(to => {
-        val content = rawMessage(originalContent, message, to, from)
+        val contentMessage = smtpMessage(originalContent, message, to, from)
+        val content = rawMessage(contentMessage)
         val subject = message.mail.commonHeaders.subject
+        val originalSender = contentMessage.getReplyTo()(0).toString
 
         // Send message to mailer
         val emailMessage = Email(Seq(to), from, subject, content, raw = true).asJson
         log.debug(s"MESSAGE: $emailMessage", keyValue("SUBJECT", subject))
         snsClient.publish(mailerTopic, emailMessage)
+        if(logEmail) count("ForwardingEmail", ("from email", originalSender))
       })
     }
   }
 
-  private def parseMessage(content: String): (MimeMessageParser, MimeMessage) = {
+  private def parseMessage(content: String): (MimeMessageParser, SMTPMessage) = {
     val s = Session.getInstance(new Properties())
     val is = new ByteArrayInputStream(content.getBytes)
-    val mimeMessage = new MimeMessage(s, is)
-    val parser = new MimeMessageParser(mimeMessage)
-    (parser.parse(), mimeMessage)
+    val smtpMessage = new SMTPMessage(s, is)
+    val parser = new MimeMessageParser(smtpMessage)
+    (parser.parse(), smtpMessage)
   }
 
-  private def rawMessage(content: String, message: SesMessage, to: String, from: String): String = {
+  private def smtpMessage(content: String, message: SesMessage, to: String, from: String): SMTPMessage = {
 
-    // parse the content and get the mimeMessage
-    val (_, mimeMessage) = parseMessage(content)
+    // parse the content and get the SMTP Message
+    val (parser, smtpMessage) = parseMessage(content)
 
     // Set reply-to address
     val replyTo: Array[Address] = message.mail.commonHeaders.from.map(new InternetAddress(_)).toArray
-    mimeMessage.setReplyTo(replyTo)
+    smtpMessage.setReplyTo(replyTo)
 
     // Set to address
     val toAddresses: Array[Address] = Seq(new InternetAddress(to)).toArray
-    mimeMessage.setRecipients(Message.RecipientType.TO, toAddresses)
+    smtpMessage.setRecipients(Message.RecipientType.TO, toAddresses)
 
     // Set from address
-    mimeMessage.setFrom(from)
+    smtpMessage.setFrom(from)
+    smtpMessage.setEnvelopeFrom(from)
+    smtpMessage.setHeader("Return-Path", from)
+    smtpMessage.setSender(new InternetAddress(from))
+
+    smtpMessage
+  }
+
+  private def rawMessage(smtpMessage: SMTPMessage): String = {
 
     // Recreate raw email
     val os = new ByteArrayOutputStream()
-    mimeMessage.writeTo(os)
-    log.debug("RAW EMAIL info", keyValue("FROM", from), keyValue("REPLY-TO", s"${message.mail.commonHeaders.from}"))
+    smtpMessage.writeTo(os)
+    log.debug("RAW EMAIL info", keyValue("FROM", smtpMessage.getFrom), keyValue("REPLY-TO", s"${smtpMessage.getReplyTo}"))
     val newMessage = os.toString()
     if(newMessage.getBytes.length > 131072) {
       log.warn(s"${newMessage.getBytes.length} byte payload is too large for the SNS Event invocation (limit 131072 bytes)")
