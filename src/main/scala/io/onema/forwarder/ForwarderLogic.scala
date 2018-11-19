@@ -134,7 +134,6 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     smtpMessage.setEnvelopeFrom(from)
     smtpMessage.setHeader("Return-Path", from)
     smtpMessage.setSender(new InternetAddress(from))
-
     smtpMessage
   }
 

@@ -24,13 +24,8 @@ provider:
   iamRoleStatements: ${file(infrastructure/global-values.yml):iamRoleStatements}
 
   # Service wide environment variables
-  environment:
-    STAGE_NAME: ${self:custom.stageName}
-    SNS_MAILER_TOPIC:
-      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
+  environment: ${file(infrastructure/global-values.yml):environment}
 
-    # The error topic is part of the bootstrap infrastructure for uServerless
-    LOG_LEVEL: DEBUG
 
 # Custom values. These can be referenced in the Cloud Formation template
 custom: ${file(infrastructure/global-values.yml):custom}

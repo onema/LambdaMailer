@@ -34,6 +34,15 @@ iamRoleStatements:
       - Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
       - Fn::GetAtt: [ForwarderS3Bucket, Arn]
 
+environment:
+  STAGE_NAME: ${self:custom.stageName}
+  LOG_LEVEL: DEBUG
+  APP_NAME: ${self:service}
+  SNS_MAILER_TOPIC:
+      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
+
+  # The error topic is part of the bootstrap infrastructure for uServerless
+
 custom:
   stageName: ${opt:stage, self:provider.stage}
 
