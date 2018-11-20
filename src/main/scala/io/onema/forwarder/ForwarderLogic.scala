@@ -12,6 +12,7 @@
 package io.onema.forwarder
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.util
 import java.util.Properties
 
 import com.amazonaws.services.s3.AmazonS3
@@ -30,6 +31,8 @@ import org.json4s.FieldSerializer._
 import org.json4s.jackson.Serialization
 import org.json4s.{FieldSerializer, Formats, NoTypeHints}
 
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
 object ForwarderLogic {
@@ -78,6 +81,7 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
+  private val headersToRemove = ArrayBuffer("DKIM-Signature", "X-SES-DKIM-SIGNATURE").toArray
 
   //--- Methods ---
   def handleRequest(message: SesMessage, emailMapping: String): Unit = {
@@ -128,6 +132,9 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     // Set to address
     val toAddresses: Array[Address] = Seq(new InternetAddress(to)).toArray
     smtpMessage.setRecipients(Message.RecipientType.TO, toAddresses)
+
+    // Remove unwanted headers
+    headersToRemove.foreach(smtpMessage.removeHeader)
 
     // Set from address
     smtpMessage.setFrom(from)
