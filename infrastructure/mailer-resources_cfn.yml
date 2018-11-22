@@ -107,6 +107,20 @@ Resources:
 
 
 Outputs:
+  LambdaMailerTopicArn:
+    Value:
+      Ref: SNSTopicDevmailer
+    Export:
+      Name:
+        Fn::Join: ["-", [Ref: StageName, "lambda-mailer-topic-arn"]]
+
+  LambdaMailerBounceTopicArn:
+    Value:
+      Ref: SNSTopicDevmailerbounce
+    Export:
+      Name:
+        Fn::Join: ["-", [Ref: StageName, "lambda-mailer-bounce-topic-arn"]]
+
   EmailBounceAndComplaintTable:
     Value:
       Ref: DynamoDBTable

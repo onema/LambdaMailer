@@ -14,7 +14,7 @@ lazy val root = (project in file("."))
     val awsSdkVersion = "1.11.451"
     Seq(
       // dependencies
-      "io.onema"                  % "userverless-core_2.12" % "0.1.0-SNAPSHOT",
+      "io.onema"                  % "userverless-core_2.12" % "0.1.0",
       "org.apache.commons"        % "commons-email"         % "1.5",
 
         // AWS Clients
