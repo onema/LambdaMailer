@@ -9,7 +9,7 @@
   * @author Juan Manuel Torres <software@onema.io>
   */
 
-import io.onema.bounce.Logic.SesNotification
+import io.onema.bounce.BounceLogic.SesNotification
 import io.onema.json.Extensions._
 import org.scalatest.{FlatSpec, Matchers}
 

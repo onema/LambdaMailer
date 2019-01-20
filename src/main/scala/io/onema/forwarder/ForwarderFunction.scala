@@ -13,7 +13,7 @@ package io.onema.forwarder
 
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.amazonaws.services.sns.AmazonSNSClientBuilder
+import software.amazon.awssdk.services.sns.SnsAsyncClient
 import io.onema.forwarder.ForwarderLogic.SesEvent
 import io.onema.json.Extensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
@@ -26,7 +26,7 @@ class ForwarderFunction extends LambdaHandler[SesEvent, Unit] with EnvLambdaConf
   private val logEmail = getValue("/log/email")
   private val shouldLog = if(logEmail.isDefined && logEmail.getOrElse("").toLowerCase() == "true") true else false
   val logic = new ForwarderLogic(
-    snsClient = AmazonSNSClientBuilder.defaultClient(),
+    snsClient = SnsAsyncClient.create(),
     mailerTopic = getValue("sns/mailer/topic").get,
     s3Client = AmazonS3ClientBuilder.defaultClient(),
     bucketName = getValue("forwarder/s3/bucket").get,

@@ -11,21 +11,21 @@
 
 package io.onema.bounce
 
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
-import io.onema.bounce.Logic.SesNotification
+import io.onema.bounce.BounceLogic.SesNotification
 import io.onema.json.Extensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.LambdaHandler
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
 import scala.collection.JavaConverters._
 
 class BounceFunction extends LambdaHandler[SNSEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
-  val logic = new Logic(
-    AmazonDynamoDBAsyncClientBuilder.defaultClient(),
+  val logic = new BounceLogic(
+    DynamoDbAsyncClient.create(),
     getValue("/table/name").getOrElse("LambdaMailerSESNotifications")
   )
 

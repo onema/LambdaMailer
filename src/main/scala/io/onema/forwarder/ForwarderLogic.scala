@@ -12,13 +12,12 @@
 package io.onema.forwarder
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-import java.util
 import java.util.Properties
 
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.sns.AmazonSNS
 import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
+import io.onema.AwsExtensions._
 import io.onema.forwarder.ForwarderLogic.SesMessage
 import io.onema.json.Extensions._
 import io.onema.mailer.MailerLogic.Email
@@ -30,10 +29,13 @@ import org.apache.commons.mail.util.MimeMessageParser
 import org.json4s.FieldSerializer._
 import org.json4s.jackson.Serialization
 import org.json4s.{FieldSerializer, Formats, NoTypeHints}
+import software.amazon.awssdk.services.sns.SnsAsyncClient
+import software.amazon.awssdk.services.sns.model.PublishRequest
+import scala.concurrent.ExecutionContext.Implicits.global
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
+import scala.util.{Failure, Success}
 
 object ForwarderLogic {
   case class Headers(name: String, value: String)
@@ -77,7 +79,7 @@ object ForwarderLogic {
   }
 }
 
-class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String, logEmail: Boolean = false) {
+class ForwarderLogic(val snsClient: SnsAsyncClient, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String, logEmail: Boolean = false) {
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
@@ -106,8 +108,12 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
         // Send message to mailer
         val emailMessage = Email(Seq(to), from, subject, content, raw = true).asJson
         log.debug(s"MESSAGE: $emailMessage", keyValue("SUBJECT", subject))
-        snsClient.publish(mailerTopic, emailMessage)
-        if(logEmail) count("ForwardingEmail", ("from email", originalSender))
+        val fut = snsClient.publish(PublishRequest.builder().topicArn(mailerTopic).message(emailMessage).build()).asScala
+        fut.onComplete {
+          case Success(response) =>
+            if(logEmail) count("ForwardingEmail", ("from email", originalSender))
+          case Failure(ex) => throw ex
+        }
       })
     }
   }

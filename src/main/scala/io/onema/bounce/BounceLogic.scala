@@ -11,17 +11,19 @@
 
 package io.onema.bounce
 
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, PutItemResult}
 import com.typesafe.scalalogging.Logger
-import io.onema.bounce.Logic.SesNotification
+import io.onema.AwsExtensions._
+import io.onema.bounce.BounceLogic.SesNotification
 import io.onema.json.Extensions._
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.dynamodb.model.{AttributeValue, PutItemRequest}
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{Failure, Success}
 
 
-object Logic {
+object BounceLogic {
   case class SesNotification(notificationType: String = "", bounce: Bounce = Bounce(), complaint: Complaint = Complaint(), mail: Mail = Mail())
   case class Bounce(
     bounceType: String = "",
@@ -58,7 +60,7 @@ object Logic {
   )
 }
 
-class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
+class BounceLogic(val dynamodbClient: DynamoDbAsyncClient, val table: String) {
 
   //--- Fields ---
   private val TTL = 604800 // 7 Days
@@ -71,31 +73,51 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
       val reportingMta = sesMessage.bounce.reportingMTA
       val sesBounceSummary = sesMessage.bounce.bouncedRecipients.asJson
       sesDestinationAddresses.foreach(destination => {
-        tryPutBounceRecord(sesMessageId, snsPublishTime, reportingMta, destination.emailAddress, sesBounceSummary, sesMessage.notificationType)
+        putBounceRecord(sesMessageId, snsPublishTime, reportingMta, destination.emailAddress, sesBounceSummary, sesMessage.notificationType)
       })
     } else if(sesMessage.notificationType == "Complaint") {
       val sesDestinationAddresses = sesMessage.complaint.complainedRecipients
       val feedbackId = sesMessage.complaint.feedbackId
       val feedbackType = sesMessage.complaint.complaintFeedbackType
       sesDestinationAddresses.foreach(destination => {
-
-        tryPutComplaintRecord(sesMessageId, snsPublishTime, feedbackId, destination.emailAddress, feedbackType)
+        putComplaintRecord(sesMessageId, snsPublishTime, feedbackId, destination.emailAddress, feedbackType)
       })
     }
   }
 
-  def tryPutBounceRecord(messageId: String, publishTime: String, reportingMTA: String, destinationAddress: String, summary: String, messageType: String): Unit = {
-    Try(recordBounce(messageId, publishTime, reportingMTA, destinationAddress, summary, messageType)) match {
-      case Success(response) =>
+  def putBounceRecord(messageId: String, publishTime: String, reportingMTA: String, destinationAddress: String, summary: String, messageType: String): Unit = {
+    log.debug(s"messageId: $messageId, publishTime: $publishTime, destination: $destinationAddress")
+    tryPutItem(
+      Map(
+        "MessageId" -> AttributeValue.builder().s(messageId).build(),
+        "DestinationAddress" -> AttributeValue.builder().s(destinationAddress).build(),
+        "SnsPublishTime" -> AttributeValue.builder().s(publishTime).build(),
+        "SESReportingMTA" -> AttributeValue.builder().s(reportingMTA).build(),
+        "SESBounceSummary" -> AttributeValue.builder().s(summary).build(),
+        "SESMessageType" -> AttributeValue.builder().s(messageType).build(),
+        "ExpirationTime" -> AttributeValue.builder().n(((System.currentTimeMillis / 1000) + TTL).toString).build()
+      )
+    ).onComplete {
+      case Success(_) =>
         log.info("Successfully recorded bounce sesMessage")
       case Failure(ex) =>
         log.error("Unable to write bounce record")
         throw ex
     }
   }
-  def tryPutComplaintRecord(messageId: String, publishTime: String, feedbackId: String, sesDestinationAddress: String, feedbackType: String): Unit = {
-    Try(recordComplaint(messageId, publishTime, feedbackId, sesDestinationAddress, feedbackType)) match {
-      case Success(response) =>
+
+  def putComplaintRecord(messageId: String, publishTime: String, feedbackId: String, sesDestinationAddress: String, feedbackType: String): Unit = {
+    log.debug(s"messageId: $messageId, publishTime: $publishTime, destination: $sesDestinationAddress, feedbackType: $feedbackType")
+    tryPutItem(
+      Map(
+        "MessageId" -> AttributeValue.builder().s(messageId).build(),
+        "DestinationAddress" -> AttributeValue.builder().s(sesDestinationAddress).build(),
+        "SnsPublishTime" -> AttributeValue.builder().s(publishTime).build(),
+        "FeedbackId" -> AttributeValue.builder().s(feedbackId).build(),
+        "FeedbackType" -> AttributeValue.builder().s(feedbackType).build()
+      )
+    ).onComplete {
+      case Success(_) =>
         log.info("Successful recorded complaint sesMessage")
       case Failure(ex) =>
         log.error("Unable to write complaint record")
@@ -103,33 +125,12 @@ class Logic(val dynamodbClient: AmazonDynamoDBAsync, val table: String) {
     }
   }
 
-  def recordBounce(messageId: String, publishTime: String, reportingMTA: String, destinationAddress: String, summary: String, messageType: String): PutItemResult = {
-    log.debug(s"messageId: $messageId, publishTime: $publishTime, destination: $destinationAddress")
+  private def tryPutItem(attributeValues: Map[String, AttributeValue]) = {
     dynamodbClient.putItem(
-      table,
-      Map(
-        "MessageId" -> new AttributeValue().withS(messageId),
-        "DestinationAddress" -> new AttributeValue().withS(destinationAddress),
-        "SnsPublishTime" -> new AttributeValue().withS(publishTime),
-        "SESReportingMTA" -> new AttributeValue().withS(reportingMTA),
-        "SESBounceSummary" -> new AttributeValue().withS(summary),
-        "SESMessageType" -> new AttributeValue().withS(messageType),
-        "ExpirationTime" -> new AttributeValue().withN(((System.currentTimeMillis / 1000) + TTL).toString)
-      ).asJava
-    )
-  }
-
-  def recordComplaint(messageId: String, publishTime: String, feedbackId: String, destinationAddress: String, feedbackType: String): PutItemResult = {
-    log.debug(s"messageId: $messageId, publishTime: $publishTime, destination: $destinationAddress, feedbackType: $feedbackType")
-    dynamodbClient.putItem(
-      table,
-      Map(
-        "MessageId" -> new AttributeValue().withS(messageId),
-        "DestinationAddress" -> new AttributeValue().withS(destinationAddress),
-        "SnsPublishTime" -> new AttributeValue().withS(publishTime),
-        "FeedbackId" -> new AttributeValue().withS(feedbackId),
-        "FeedbackType" -> new AttributeValue().withS(feedbackType)
-      ).asJava
-    )
+      PutItemRequest.builder()
+        .tableName(table)
+        .item(attributeValues.asJava)
+        .build()
+    ).asScala
   }
 }
