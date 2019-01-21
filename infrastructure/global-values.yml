@@ -12,8 +12,8 @@ iamRoleStatements:
       - dynamodb:GetItem
       - dynamodb:Query
     Resource:
-      - Fn::GetAtt: [ DynamoDBTable, Arn ]
-      - Fn::Join: ["/", [ Fn::GetAtt: [DynamoDBTable, Arn], "index", "*"]]
+      - Fn::GetAtt: [ LambdaMailerTable, Arn ]
+      - Fn::Join: ["/", [ Fn::GetAtt: [LambdaMailerTable, Arn], "index", "*"]]
   - Effect: Allow
     Action:
       - ses:SendEmail

@@ -1,8 +1,4 @@
 Parameters:
-  TableName:
-    Type: String
-    Default: LambdaMailerSESNotifications
-    Description: The name of the dynamodb table
   PartitionKey:
     Type: String
     Default: MessageId
@@ -30,12 +26,9 @@ Parameters:
 
 Resources:
 
-  DynamoDBTable:
+  LambdaMailerTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName:
-        Ref: TableName
-
       AttributeDefinitions:
       - AttributeName:
           Ref: PartitionKey
@@ -109,21 +102,21 @@ Resources:
 Outputs:
   LambdaMailerTopicArn:
     Value:
-      Ref: SNSTopicDevmailer
+      Ref: SNSTopicMailer
     Export:
       Name:
         Fn::Join: ["-", [Ref: StageName, "lambda-mailer-topic-arn"]]
 
   LambdaMailerBounceTopicArn:
     Value:
-      Ref: SNSTopicDevmailerbounce
+      Ref: SNSTopicMailerbounce
     Export:
       Name:
         Fn::Join: ["-", [Ref: StageName, "lambda-mailer-bounce-topic-arn"]]
 
   EmailBounceAndComplaintTable:
     Value:
-      Ref: DynamoDBTable
+      Ref: LambdaMailerTable
 
   ForwarderS3BucketArn:
     Value:
