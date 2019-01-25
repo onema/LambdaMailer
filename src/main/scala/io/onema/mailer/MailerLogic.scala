@@ -161,7 +161,7 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
     case Some(att) => att.map(a => {
       val destinationFile = s"/tmp/${a.stripPrefix("/")}"
       log.debug(s"Downloading attachment from $a")
-      val s3Object = s3Client.getObject(bucketName, a)
+      val s3Object = s3Client.getObject(bucketName, a.stripPrefix("/"))
       local.write(destinationFile, s3Object.getObjectContent.toBytes)
       val metadata = s3Object.getObjectMetadata
       val att = new MimeBodyPart()
