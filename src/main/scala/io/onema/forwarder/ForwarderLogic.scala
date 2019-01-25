@@ -159,7 +159,7 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
   }
 
   private def uploadAttachment(x: DataSource, contentId: String, messageId: String): String = {
-    val destinationName = s"/$messageId/${x.getName}"
+    val destinationName = s"$messageId/${x.getName}"
     log.debug(s"Uploading attachment to $destinationName")
     val metadata = new ObjectMetadata()
     metadata.addUserMetadata("ContentId", contentId)
