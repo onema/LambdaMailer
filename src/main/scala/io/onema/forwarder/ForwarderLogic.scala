@@ -11,8 +11,7 @@
 
 package io.onema.forwarder
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-import java.util
+import java.io.ByteArrayInputStream
 import java.util.Properties
 
 import com.amazonaws.services.s3.AmazonS3
@@ -23,8 +22,11 @@ import io.onema.forwarder.ForwarderLogic.SesMessage
 import io.onema.json.Extensions._
 import io.onema.mailer.MailerLogic.Email
 import io.onema.userverless.monitoring.LogMetrics._
-import javax.mail.internet.InternetAddress
-import javax.mail.{Address, Message, Session}
+import io.onema.vff.FileSystem
+import io.onema.vff.adapter.AwsS3Adapter
+import io.onema.vff.extensions.StreamExtensions._
+import javax.activation.DataSource
+import javax.mail.Session
 import net.logstash.logback.argument.StructuredArguments._
 import org.apache.commons.mail.util.MimeMessageParser
 import org.json4s.FieldSerializer._
@@ -77,16 +79,18 @@ object ForwarderLogic {
   }
 }
 
-class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String, logEmail: Boolean = false) {
+class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String, val attachmentBucket: String, val logEmail: Boolean = false) {
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
   private val headersToRemove = ArrayBuffer("DKIM-Signature", "X-SES-DKIM-SIGNATURE").toArray
+  private val s3 = new FileSystem(new AwsS3Adapter(s3Client, attachmentBucket))
 
   //--- Methods ---
   def handleRequest(message: SesMessage, emailMapping: String): Unit = {
 
     // The email mapping will get us all the addresses associated with the forwarder address
+    val messageId = message.mail.messageId
     val allowedForwardingEmailMapping = parseEmailMapping(emailMapping)
     val resultingForwardingEmails = getForwardingEmailAddresses(message.receipt.recipients, allowedForwardingEmailMapping)
     log.debug(s"addresses found: $resultingForwardingEmails")
@@ -98,13 +102,14 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     // iterate over each mapped address and forward the email
     resultingForwardingEmails.foreach{case (from, toEmails) =>
       toEmails.foreach(to => {
-        val contentMessage = smtpMessage(originalContent, message, to, from)
-        val content = rawMessage(contentMessage)
+        val (parser, _) = parseMessage(originalContent)
+        val htmlContent = content(parser)
+        val att = attachments(parser, messageId)
         val subject = message.mail.commonHeaders.subject
-        val originalSender = contentMessage.getReplyTo()(0).toString
+        val originalSender: String = message.mail.commonHeaders.from.mkString(",")
 
         // Send message to mailer
-        val emailMessage = Email(Seq(to), from, subject, content, raw = true).asJson
+        val emailMessage = Email(Seq(to), from, subject, htmlContent, replyTo = Some(originalSender), attachments = att).asJson
         log.debug(s"MESSAGE: $emailMessage", keyValue("SUBJECT", subject))
         snsClient.publish(mailerTopic, emailMessage)
         if(logEmail) count("ForwardingEmail", ("from email", originalSender))
@@ -120,41 +125,28 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     (parser.parse(), smtpMessage)
   }
 
-  private def smtpMessage(content: String, message: SesMessage, to: String, from: String): SMTPMessage = {
-
-    // parse the content and get the SMTP Message
-    val (parser, smtpMessage) = parseMessage(content)
-
-    // Set reply-to address
-    val replyTo: Array[Address] = message.mail.commonHeaders.from.map(new InternetAddress(_)).toArray
-    smtpMessage.setReplyTo(replyTo)
-
-    // Set to address
-    val toAddresses: Array[Address] = Seq(new InternetAddress(to)).toArray
-    smtpMessage.setRecipients(Message.RecipientType.TO, toAddresses)
-
-    // Remove unwanted headers
-    headersToRemove.foreach(smtpMessage.removeHeader)
-
-    // Set from address
-    smtpMessage.setFrom(from)
-    smtpMessage.setEnvelopeFrom(from)
-    smtpMessage.setHeader("Return-Path", from)
-    smtpMessage.setSender(new InternetAddress(from))
-    smtpMessage
+  private def content(mimeMessageParser: MimeMessageParser): String = {
+    if(mimeMessageParser.hasHtmlContent) {
+      mimeMessageParser.getHtmlContent
+    } else {
+      mimeMessageParser.getPlainContent
+    }
   }
 
-  private def rawMessage(smtpMessage: SMTPMessage): String = {
-
-    // Recreate raw email
-    val os = new ByteArrayOutputStream()
-    smtpMessage.writeTo(os)
-    log.debug("RAW EMAIL info", keyValue("FROM", smtpMessage.getFrom), keyValue("REPLY-TO", s"${smtpMessage.getReplyTo}"))
-    val newMessage = os.toString()
-    if(newMessage.getBytes.length > 131072) {
-      log.warn(s"${newMessage.getBytes.length} byte payload is too large for the SNS Event invocation (limit 131072 bytes)")
+  private def attachments(mimeMessageParser: MimeMessageParser, messageId: String): Option[Seq[String]] = {
+    if(mimeMessageParser.hasAttachments) {
+      Some(mimeMessageParser.getAttachmentList.asScala.map(uploadAttachment(_, messageId)))
+    } else {
+      None
     }
-    newMessage
+  }
+
+  private def uploadAttachment(x: DataSource, messageId: String): String = {
+    val fileBytes = x.getInputStream.toBytes
+    val destinationName = s"/$messageId/${x.getName}"
+    log.debug(s"Uploading attachment to $destinationName")
+    s3.write(destinationName, fileBytes)
+    destinationName
   }
 
   private def parseEmailMapping(mapping: String): Map[String, Seq[String]] = {
