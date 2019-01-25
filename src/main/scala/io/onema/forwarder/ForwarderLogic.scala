@@ -134,7 +134,11 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
 
   private def attachments(mimeMessageParser: MimeMessageParser, messageId: String): Option[Seq[String]] = {
     if(mimeMessageParser.hasAttachments) {
-      val attachmentMap = mimeMessageParser.getContentIds.asScala.map(x => (x, mimeMessageParser.findAttachmentByCid(x))).filter(_._2 != null).toMap
+      val attachmentMap = mimeMessageParser
+        .getContentIds.asScala
+        .map(x => (x, mimeMessageParser.findAttachmentByCid(x)))
+        .filter(_._2 != null)
+        .toMap
       val files = if(attachmentMap.size == mimeMessageParser.getAttachmentList.size()) {
         attachmentMap.map { case(cid, file) => uploadAttachment(file,cid, messageId)}
       } else {
