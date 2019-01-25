@@ -15,6 +15,7 @@ import java.io.ByteArrayInputStream
 import java.util.Properties
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.sns.AmazonSNS
 import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
@@ -34,7 +35,6 @@ import org.json4s.jackson.Serialization
 import org.json4s.{FieldSerializer, Formats, NoTypeHints}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
 object ForwarderLogic {
@@ -83,7 +83,6 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
-  private val headersToRemove = ArrayBuffer("DKIM-Signature", "X-SES-DKIM-SIGNATURE").toArray
   private val s3 = new FileSystem(new AwsS3Adapter(s3Client, attachmentBucket))
 
   //--- Methods ---
@@ -135,7 +134,13 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
 
   private def attachments(mimeMessageParser: MimeMessageParser, messageId: String): Option[Seq[String]] = {
     if(mimeMessageParser.hasAttachments) {
-      Some(mimeMessageParser.getAttachmentList.asScala.map(uploadAttachment(_, messageId)))
+      val attachmentMap = mimeMessageParser.getContentIds.asScala.map(x => (x, mimeMessageParser.findAttachmentByCid(x))).filter(_._2 != null).toMap
+      val files = if(attachmentMap.size == mimeMessageParser.getAttachmentList.size()) {
+        attachmentMap.map { case(cid, file) => uploadAttachment(file,cid, messageId)}
+      } else {
+        mimeMessageParser.getAttachmentList.asScala.map(uploadAttachment(_, messageId))
+      }
+      Some(files.toSeq)
     } else {
       None
     }
@@ -146,6 +151,15 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     val destinationName = s"/$messageId/${x.getName}"
     log.debug(s"Uploading attachment to $destinationName")
     s3.write(destinationName, fileBytes)
+    destinationName
+  }
+
+  private def uploadAttachment(x: DataSource, contentId: String, messageId: String): String = {
+    val destinationName = s"/$messageId/${x.getName}"
+    log.debug(s"Uploading attachment to $destinationName")
+    val metadata = new ObjectMetadata()
+    metadata.addUserMetadata("ContentId", contentId)
+    s3Client.putObject(attachmentBucket, destinationName, x.getInputStream, metadata)
     destinationName
   }
 

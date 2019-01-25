@@ -39,7 +39,7 @@ import scala.util.{Failure, Success, Try}
 
 object MailerLogic {
   case class Email(to: Seq[String], from: String, subject: String, body: String, raw: Boolean = false, replyTo: Option[String] = None, attachments: Option[Seq[String]] = None) {
-    lazy val request: SendRawEmailRequest = {
+    def request(atts: Seq[MimeBodyPart]): SendRawEmailRequest = {
 
       // Create a new smtpMessage to build the Email
       val session = Session.getInstance(new Properties())
@@ -63,13 +63,7 @@ object MailerLogic {
       multiPartMessage.addBodyPart(wrapper)
 
       // Add any attachments, all attachments must be in a local directory at this point
-      attachments.foreach(_.foreach(attachment => {
-        val att = new MimeBodyPart()
-        val fds = new FileDataSource(attachment)
-        att.setDataHandler(new DataHandler(fds))
-        att.setFileName(fds.getName)
-        multiPartMessage.addBodyPart(att)
-      }))
+      atts.foreach(multiPartMessage.addBodyPart)
 
       // Set basic email information
       smtpMessage.setSubject(subject)
@@ -120,7 +114,7 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
 
   //--- Methods ---
   def handleRequest(email: Email): Unit = {
-    val filteredEmails = email.copy(to = email.to.filter(isNotBlocked), attachments = getAttachments(email.attachments))
+    val filteredEmails = email.copy(to = email.to.filter(isNotBlocked))
     if(filteredEmails.to.nonEmpty) {
       val value = if(shouldLogEmail) filteredEmails.to else s"${filteredEmails.to.size} emails"
       log.info(s"Sending message to $value")
@@ -136,7 +130,7 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
       sesClient.sendRawEmail(email.rawRequest)
     } else {
       log.debug("Sending", keyValue("BODY", email.body))
-      sesClient.sendRawEmail(email.request)
+      sesClient.sendRawEmail(email.request(getAttachments(email.attachments)))
       count("emailSent")
     }
     log.info("Email sent successfully")
@@ -163,19 +157,22 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
     index.query(query)
   }
 
-  private def getAttachments(attachments: Option[Seq[String]]): Option[Seq[String]] = attachments match {
-    case Some(att) => Some(att.map(a => {
+  private def getAttachments(attachments: Option[Seq[String]]): Seq[MimeBodyPart] = attachments match {
+    case Some(att) => att.map(a => {
       val destinationFile = s"/tmp/${a.stripPrefix("/")}"
       log.debug(s"Downloading attachment from $a")
-      val dataOption = s3.read(a)
-      dataOption.foreach(x => local.write(destinationFile, x.toBytes))
-      if(local.has(destinationFile) ){
-        log.debug(s"Attachment downloaded to $destinationFile")
-      } else {
-        log.debug(s"The attachment was downloaded but was not properly written in the directory $destinationFile")
-      }
-      destinationFile
-    }))
-    case None => None
+      val s3Object = s3Client.getObject(bucketName, a)
+      local.write(destinationFile, s3Object.getObjectContent.toBytes)
+      val metadata = s3Object.getObjectMetadata
+      val att = new MimeBodyPart()
+      val fds = new FileDataSource(destinationFile)
+
+      // Add the content id of the attachment if it exists
+      Option(metadata.getUserMetaDataOf("ContentId")).foreach(att.setContentID)
+      att.setDataHandler(new DataHandler(fds))
+      att.setFileName(fds.getName)
+      att
+    })
+    case None => Seq()
   }
 }
