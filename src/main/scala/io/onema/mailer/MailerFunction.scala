@@ -13,6 +13,7 @@ package io.onema.mailer
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceAsyncClientBuilder
 import io.onema.json.JavaExtensions._
 import io.onema.mailer.MailerLogic.Email
@@ -27,7 +28,9 @@ class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
   val logic = new MailerLogic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
-    getValue("/table/name").getOrElse("LambdaMailerSESNotifications"),
+    AmazonS3ClientBuilder.defaultClient(),
+    getValue("/table/name").getOrElse(throw new Exception("Table name is a required value")),
+    getValue("/attachment/bucket").getOrElse(throw new Exception("Attachment bucket is a required value")),
     shouldLog
   )
 
