@@ -25,13 +25,15 @@ class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
   //--- Fields ---
   private val logEmail = getValue("/log/email")
   private val shouldLog = if(logEmail.isDefined && logEmail.getOrElse("").toLowerCase() == "true") true else false
+  private val reportException = if(getValue("/report/exception").getOrElse("").toLowerCase() == "true") true else false
   val logic = new MailerLogic(
     AmazonSimpleEmailServiceAsyncClientBuilder.defaultClient(),
     AmazonDynamoDBAsyncClientBuilder.defaultClient(),
     AmazonS3ClientBuilder.defaultClient(),
     getValue("/table/name").getOrElse(throw new Exception("Table name is a required value")),
     getValue("/attachment/bucket").getOrElse(throw new Exception("Attachment bucket is a required value")),
-    shouldLog
+    shouldLog,
+    reportException
   )
 
   //--- Methods ---

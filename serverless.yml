@@ -54,6 +54,7 @@ functions:
       LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
       TABLE_NAME:
         Ref: LambdaMailerTable
+      REPORT_EXCEPTION: false
     events:
       - sns: ${self:custom.stageName}-mailer
 

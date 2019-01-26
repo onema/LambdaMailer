@@ -25,6 +25,7 @@ import com.amazonaws.services.simpleemail.model._
 import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
 import io.onema.userverless.monitoring.LogMetrics._
+import io.onema.userverless.exception.ThrowableExtensions._
 import io.onema.mailer.MailerLogic.Email
 import io.onema.vff.FileSystem
 import io.onema.vff.adapter.AwsS3Adapter
@@ -110,7 +111,7 @@ object MailerLogic {
   }
 }
 
-class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val s3Client: AmazonS3, val tableName: String, val bucketName: String, val shouldLogEmail: Boolean) {
+class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val s3Client: AmazonS3, val tableName: String, val bucketName: String, val shouldLogEmail: Boolean, val reportException: Boolean) {
 
   //--- Fields ---
   protected val log = Logger("mailer-logic")
@@ -125,7 +126,9 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
     if(filteredEmails.to.nonEmpty) {
       val value = if(shouldLogEmail) filteredEmails.to else s"${filteredEmails.to.size} emails"
       log.info(s"Sending message to $value")
-      sendEmail(filteredEmails)
+      Try(sendEmail(filteredEmails)) match {
+        case Failure(ex) => log.error(ex.structuredMessage(reportException = false))
+      }
     } else {
       log.info(s"All emails are blocked")
     }
@@ -139,8 +142,8 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
       log.debug("Sending", keyValue("BODY", email.body))
       val atts = attachments(email)
       sesClient.sendRawEmail(email.request(atts))
-      count("emailSent")
     }
+    count("emailSent")
     log.info("Email sent successfully")
   }
 
