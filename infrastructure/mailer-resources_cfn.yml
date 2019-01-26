@@ -122,13 +122,15 @@ Resources:
 
 Outputs:
   LambdaMailerTopicArn:
-    Value: "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
+    Value:
+      Fn::Join: [":", ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
     Export:
       Name:
         Fn::Join: ["-", [Ref: StageName, "lambda-mailer-topic-arn"]]
 
   LambdaMailerBounceTopicArn:
-    Value: "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
+    Value:
+      Fn::Join: [":", ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer-bounce"]]
     Export:
       Name:
         Fn::Join: ["-", [Ref: StageName, "lambda-mailer-bounce-topic-arn"]]

@@ -49,6 +49,7 @@ functions:
 
   mailer:
     handler: io.onema.mailer.MailerFunction::lambdaHandler
+    reservedConcurrency: 1
     environment:
       LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
       TABLE_NAME:
