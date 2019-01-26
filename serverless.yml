@@ -41,27 +41,26 @@ functions:
   # functions
   mailer-bounce:
     handler: io.onema.bounce.BounceFunction::lambdaHandler
-    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       TABLE_NAME:
         Ref: LambdaMailerTable
     events:
-      - sns: mailer-bounce
+      - sns: ${self:custom.stageName}-mailer-bounce
 
   mailer:
     handler: io.onema.mailer.MailerFunction::lambdaHandler
-    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
       LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
       TABLE_NAME:
         Ref: LambdaMailerTable
     events:
-      - sns: mailer
+      - sns: ${self:custom.stageName}-mailer
 
   forwarder:
     handler: io.onema.forwarder.ForwarderFunction::lambdaHandler
-    onError: ${file(infrastructure/global-values.yml):deadLetterQueue}
     environment:
+      SNS_MAILER_TOPIC:
+        Fn::Join: [":", ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
       EMAIL_MAPPING: ${env:EMAIL_MAPPING}
       FORWARDER_S3_BUCKET:
         Ref: ForwarderS3Bucket

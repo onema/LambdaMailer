@@ -29,6 +29,7 @@ Resources:
   LambdaMailerTable:
     Type: AWS::DynamoDB::Table
     Properties:
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
       - AttributeName:
           Ref: PartitionKey
@@ -56,20 +57,28 @@ Resources:
           KeyType: HASH
         Projection:
           ProjectionType: ALL
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-
-      ProvisionedThroughput:
-        ReadCapacityUnits:
-          Ref: ReadCapacityUnits
-        WriteCapacityUnits:
-          Ref: WriteCapacityUnits
+          # Change the billing mode to PROVISIONED and uncomment if you want to define the read/write capacity units
+#        ProvisionedThroughput:
+#          ReadCapacityUnits: 1
+#          WriteCapacityUnits: 1
+#      ProvisionedThroughput:
+#        ReadCapacityUnits:
+#          Ref: ReadCapacityUnits
+#        WriteCapacityUnits:
+#          Ref: WriteCapacityUnits
 
       TimeToLiveSpecification:
         AttributeName: ExpirationTime
         Enabled: true
 
+  MailerAttachments:
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 30
+            Id: delete-after-30-days
+            Status: Enabled
   ForwarderS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -97,19 +106,29 @@ Resources:
               StringEquals:
                 aws:Referer:
                   Ref: AWS::AccountId
+  CreateTestDBPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Policy for third arties to add files to the mailer attachments bucket
+      Path: "/"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "s3:PutObject"
+            Resource:
+              Fn::GetAtt: [MailerAttachments, Arn]
 
 
 Outputs:
   LambdaMailerTopicArn:
-    Value:
-      Ref: SNSTopicMailer
+    Value: "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
     Export:
       Name:
         Fn::Join: ["-", [Ref: StageName, "lambda-mailer-topic-arn"]]
 
   LambdaMailerBounceTopicArn:
-    Value:
-      Ref: SNSTopicMailerbounce
+    Value: "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
     Export:
       Name:
         Fn::Join: ["-", [Ref: StageName, "lambda-mailer-bounce-topic-arn"]]
@@ -117,6 +136,16 @@ Outputs:
   EmailBounceAndComplaintTable:
     Value:
       Ref: LambdaMailerTable
+
+  MailerAttachmentsS3BucketArn:
+    Value:
+      Fn::GetAtt: [MailerAttachments, Arn]
+    Description: ARN of S3 bucket for storing mailer attachments
+
+  MailerAttachmentsS3BucketName:
+    Value:
+      Ref: MailerAttachments
+    Description: Name of S3 bucket for storing mailer attachments
 
   ForwarderS3BucketArn:
     Value:

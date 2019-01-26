@@ -6,7 +6,7 @@ LambdaMailer
 LambdaMailer is a simple Serverless mailing system for AWS SES build on [µServerless](https://github.com/onema/uServerless) and [Scala](https://www.scala-lang.org/)
 and deployed using the [serverless framework](https://serverless.com).
 
-The project defines three lambda functions (mailer, bouce, and forwarder) and a dynamodb table to keep track of bounces and complaints.
+The project defines three lambda functions (mailer, bounce, and forwarder) and a dynamodb table to keep track of bounces and complaints.
 
 ![Serverless Lambda Mailer](docs/img/ServerlessLambdaMailer.png)
 
@@ -21,18 +21,20 @@ a JSON object with the following format:
     "subject": "test01",
     "body": "<h1>Test Body</h1>",
     "replyTo": "no-reply@mailer.mydomain.com",
-    "raw": false
+    "raw": false,
+    "attachments": ["s3/path/in/the/attachments/bucket.png"]
 }
 ```
 
-| Field     | type         | description                                                                                 |
-|-----------|--------------|---------------------------------------------------------------------------------------------|
-| `to`      | List\[String\] | A list of valid email addresses                                                           |
-| `from`    | String       | Email address that will be use to send the email, this must be an approved email or domain. |
-| `subject` | String       | The subject of the email                                                                    |
-| `body`    | String       | HTML or Plain Text body of the email                                                        |
-| `replyTo` | String       | The reply-to email address, can be different from the `from` email                          |
-| `raw`     | Boolean      | Specifies weather the body of the email is a raw email message (true) or text/html (false)  |
+| Field         | type         | description                                                                                 |
+|-------------- |--------------|---------------------------------------------------------------------------------------------|
+| `to`          | List\[String\] | A list of valid email addresses                                                           |
+| `from`        | String       | Email address that will be use to send the email, this must be an approved email or domain. |
+| `subject`     | String       | The subject of the email                                                                    |
+| `body`        | String       | HTML or Plain Text body of the email                                                        |
+| `replyTo`     | String       | The reply-to email address, can be different from the `from` email                          |
+| `raw`         | Boolean      | Specifies weather the body of the email is a raw email message (true) or text/html (false)  |
+| `attachments` | List\[String\] | A list containing keys in the attachments bucket                                          |
 
 
 The mailer will check each email address against the bounce dynamodb table to prevent sending emails to
@@ -67,7 +69,6 @@ For more information see the installation instructions below.
 ## Installation
 You must build the project before it is deployed using SBT:
 ```bash
-sbt compile
 sbt assembly
 ```
 

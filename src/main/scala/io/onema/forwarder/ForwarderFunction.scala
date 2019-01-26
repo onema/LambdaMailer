@@ -30,6 +30,7 @@ class ForwarderFunction extends LambdaHandler[SesEvent, Unit] with EnvLambdaConf
     mailerTopic = getValue("sns/mailer/topic").get,
     s3Client = AmazonS3ClientBuilder.defaultClient(),
     bucketName = getValue("forwarder/s3/bucket").get,
+    attachmentBucket = getValue("attachment/bucket").get,
     shouldLog
   )
 

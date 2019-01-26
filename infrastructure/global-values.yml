@@ -4,7 +4,6 @@ iamRoleStatements:
       - sns:Publish
     Resource:
       - "arn:aws:sns:*:*:${self:custom.stageName}-mailer-bounce"
-      - "arn:aws:sns:*:*:${self:custom.stageName}-bounce-topic"
       - "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
   - Effect: Allow
     Action:
@@ -33,18 +32,22 @@ iamRoleStatements:
     Resource:
       - Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
       - Fn::GetAtt: [ForwarderS3Bucket, Arn]
+  - Effect: Allow
+    Action:
+      - s3:PutObject
+      - s3:GetObject
+    Resource:
+      - Fn::Join: ["/", [Fn::GetAtt: [MailerAttachments, Arn], "*"]]
+      - Fn::GetAtt: [MailerAttachments, Arn]
 
 environment:
   STAGE_NAME: ${self:custom.stageName}
   LOG_LEVEL: DEBUG
   APP_NAME: ${self:service}
-  SNS_MAILER_TOPIC:
-      Fn::Join: [':', ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
+  ATTACHMENT_BUCKET:
+    Ref: MailerAttachments
 
   # The error topic is part of the bootstrap infrastructure for uServerless
 
 custom:
   stageName: ${opt:stage, self:provider.stage}
-
-deadLetterQueue:
-  Fn::ImportValue: "${self:custom.stageName}-dead-letter-queue-arn"
