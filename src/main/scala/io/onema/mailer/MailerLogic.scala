@@ -39,6 +39,12 @@ import scala.util.{Failure, Success, Try}
 
 object MailerLogic {
   case class Email(to: Seq[String], from: String, subject: String, body: String, raw: Boolean = false, replyTo: Option[String] = None, attachments: Option[Seq[String]] = None) {
+
+    /**
+      * Build a request from the Email object and any attachments passed to it
+      * @param atts list of mime body parts containing attachments
+      * @return
+      */
     def request(atts: Seq[MimeBodyPart]): SendRawEmailRequest = {
 
       // Create a new smtpMessage to build the Email
@@ -92,6 +98,7 @@ object MailerLogic {
       request
     }
 
+
     lazy val rawRequest: SendRawEmailRequest = {
       val message = new RawMessage().withData(ByteBuffer.wrap(body.getBytes()))
       val request = new SendRawEmailRequest()
@@ -130,16 +137,22 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
       sesClient.sendRawEmail(email.rawRequest)
     } else {
       log.debug("Sending", keyValue("BODY", email.body))
-      sesClient.sendRawEmail(email.request(getAttachments(email.attachments)))
+      val atts = attachments(email)
+      sesClient.sendRawEmail(email.request(atts))
       count("emailSent")
     }
     log.info("Email sent successfully")
   }
 
+  /**
+    * Check if the destination address is in the bounce/complaint list
+    * @param destinationAddress destination address to check for
+    * @return
+    */
   def isNotBlocked(destinationAddress: String): Boolean = {
     Try(findEmail(destinationAddress)) match {
       case Success(response) =>
-        log.info("Successfully query the sesMessage table")
+        log.info(s"Successfully query the $tableName table")
 
         // If it does find any items in the table, the address is not blocked
         !response.iterator().hasNext
@@ -149,6 +162,11 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
     }
   }
 
+  /**
+    * Find an email in the bounce/complaint table
+    * @param destinationAddress destination address to check for
+    * @return
+    */
   private def findEmail(destinationAddress: String): ItemCollection[QueryOutcome]  = {
     val index = table.getIndex("EmailIndex")
     val query = new QuerySpec()
@@ -157,7 +175,13 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
     index.query(query)
   }
 
-  private def getAttachments(attachments: Option[Seq[String]]): Seq[MimeBodyPart] = attachments match {
+  /**
+    * Check for any attachment anc create a MimeBodyPart for each of them. Set the original ContentId if it was
+    * set in the user metadata
+    * @param email object containing information about the attachments if any.
+    * @return
+    */
+  private def attachments(email: Email): Seq[MimeBodyPart] = email.attachments match {
     case Some(att) => att.map(a => {
       val destinationFile = s"/tmp/${a.stripPrefix("/")}"
       log.debug(s"Downloading attachment from $a")
