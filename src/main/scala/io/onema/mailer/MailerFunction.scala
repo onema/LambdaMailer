@@ -19,6 +19,9 @@ import io.onema.json.JavaExtensions._
 import io.onema.mailer.MailerLogic.Email
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.SnsHandler
+import io.onema.userverless.exception.ThrowableExtensions._
+
+import scala.util.{Failure, Success, Try}
 
 class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
 
@@ -33,12 +36,14 @@ class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
     getValue("/table/name").getOrElse(throw new Exception("Table name is a required value")),
     getValue("/attachment/bucket").getOrElse(throw new Exception("Attachment bucket is a required value")),
     shouldLog,
-    reportException
   )
 
   //--- Methods ---
   def execute(email: Email, context: Context): Unit = {
     log.info(email.asJson)
-    logic.handleRequest(email)
+    Try(logic.handleRequest(email)) match {
+      case Failure(ex) => log.error(ex.structuredMessage(reportException = reportException))
+      case Success(_) =>
+    }
   }
 }
