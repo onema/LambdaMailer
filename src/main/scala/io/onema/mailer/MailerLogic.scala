@@ -18,7 +18,7 @@ import java.util.Properties
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec
 import com.amazonaws.services.dynamodbv2.document.utils.ValueMap
-import com.amazonaws.services.dynamodbv2.document.{DynamoDB, ItemCollection, QueryOutcome}
+import com.amazonaws.services.dynamodbv2.document.{DynamoDB, ItemCollection, QueryOutcome, Table}
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService
 import com.amazonaws.services.simpleemail.model._
@@ -110,14 +110,10 @@ object MailerLogic {
   }
 }
 
-class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: AmazonDynamoDBAsync, val s3Client: AmazonS3, val tableName: String, val bucketName: String, val shouldLogEmail: Boolean) {
+class MailerLogic(val sesClient: AmazonSimpleEmailService, val table: Table, val s3Client: AmazonS3, val local: FileSystem, val bucketName: String, val shouldLogEmail: Boolean) {
 
   //--- Fields ---
   protected val log = Logger("mailer-logic")
-  private val dynamoDb = new DynamoDB(dynamodbClient)
-  private val table = dynamoDb.getTable(tableName)
-  private val local = FileSystem()
-  private val s3 = new FileSystem(new AwsS3Adapter(s3Client, bucketName))
 
   //--- Methods ---
   def handleRequest(email: Email): Unit = {
@@ -152,7 +148,7 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val dynamodbClient: A
   def isNotBlocked(destinationAddress: String): Boolean = {
     Try(findEmail(destinationAddress)) match {
       case Success(response) =>
-        log.info(s"Successfully query the $tableName table")
+        log.debug(s"Successfully query the ${table.getTableName} table")
 
         // If it does find any items in the table, the address is not blocked
         !response.iterator().hasNext
