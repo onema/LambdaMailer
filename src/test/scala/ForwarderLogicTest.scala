@@ -13,8 +13,8 @@ import java.io.ByteArrayInputStream
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.S3Object
 import com.amazonaws.services.sns.AmazonSNS
-import io.onema.forwarder.ForwarderLogic
 import io.onema.forwarder.ForwarderLogic.SesMessage
+import io.onema.forwarder.{ForwarderFunction, ForwarderLogic}
 import io.onema.json.Extensions._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FlatSpec, Matchers}
