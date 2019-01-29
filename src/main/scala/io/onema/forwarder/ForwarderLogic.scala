@@ -39,7 +39,7 @@ import scala.io.Source
 
 object ForwarderLogic {
   case class Headers(name: String, value: String)
-  case class CommonHeaders(returnPath: String, from: List[String], date: String, to: List[String], messageId: String, subject: String)
+  case class CommonHeaders(returnPath: String, from: List[String], date: String, to: List[String], subject: String, messageId: Option[String], replyTo: Option[List[String]], sender: Option[String])
   case class Mail(
     timestamp: String,
     source: String,
@@ -91,7 +91,7 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     // The email mapping will get us all the addresses associated with the forwarder address
     val messageId = message.mail.messageId
     val allowedForwardingEmailMapping = parseEmailMapping(emailMapping)
-    val resultingForwardingEmails = getForwardingEmailAddresses(message.receipt.recipients, allowedForwardingEmailMapping)
+    val resultingForwardingEmails = getForwardingEmailAddresses(message.receipt.recipients.map(_.toLowerCase), allowedForwardingEmailMapping)
     log.debug(s"addresses found: $resultingForwardingEmails")
 
     // Get message from s3 and parse it
