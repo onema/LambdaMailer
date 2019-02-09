@@ -4,7 +4,7 @@
   * please view the LICENSE file that was distributed
   * with this source code.
   *
-  * copyright (c) 2018, Juan Manuel Torres (http://onema.io)
+  * copyright (c) 2018 - 2019, Juan Manuel Torres (http://onema.io)
   *
   * @author Juan Manuel Torres <software@onema.io>
   */
@@ -20,17 +20,13 @@ import io.onema.json.JavaExtensions._
 import io.onema.mailer.MailerLogic.Email
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
 import io.onema.userverless.function.SnsHandler
-import io.onema.userverless.exception.ThrowableExtensions._
 import io.onema.vff.FileSystem
-
-import scala.util.{Failure, Success, Try}
 
 class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
 
   //--- Fields ---
   private val logEmail = getValue("/log/email")
-  private val shouldLog = if(logEmail.isDefined && logEmail.getOrElse("").toLowerCase() == "true") true else false
-  private val reportException = if(getValue("/report/exception").getOrElse("").toLowerCase() == "true") true else false
+  private val shouldLog = logEmail.isDefined && logEmail.getOrElse("false").toBoolean
   private val tableName = getValue("/table/name").getOrElse(throw new Exception("Table name is a required value"))
   private val dynamodbClient = AmazonDynamoDBAsyncClientBuilder.defaultClient()
   private val dynamoDb = new DynamoDB(dynamodbClient)
@@ -45,12 +41,12 @@ class MailerFunction extends SnsHandler[Email] with EnvLambdaConfiguration {
     shouldLog,
   )
 
+  // Prevent the mailer from reporting exceptions to avoid infinite call loops
+  override protected val reportException: Boolean = false
+
   //--- Methods ---
   def execute(email: Email, context: Context): Unit = {
     log.info(email.asJson)
-    Try(logic.handleRequest(email)) match {
-      case Failure(ex) => log.error(ex.structuredMessage(reportException = reportException))
-      case Success(_) =>
-    }
+    logic.handleRequest(email)
   }
 }
