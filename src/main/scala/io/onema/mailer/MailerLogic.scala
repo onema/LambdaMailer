@@ -15,19 +15,19 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.Properties
 
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync
-import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec
-import com.amazonaws.services.dynamodbv2.document.utils.ValueMap
-import com.amazonaws.services.dynamodbv2.document.{DynamoDB, ItemCollection, QueryOutcome, Table}
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService
 import com.amazonaws.services.simpleemail.model._
+import com.gu.scanamo._
+import com.gu.scanamo.error.DynamoReadError
+import com.gu.scanamo.syntax._
 import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
-import io.onema.userverless.monitoring.LogMetrics._
+import io.onema.bounce.BounceLogic.BounceComplaintItem
 import io.onema.mailer.MailerLogic.Email
+import io.onema.userverless.monitoring.LogMetrics._
 import io.onema.vff.FileSystem
-import io.onema.vff.adapter.AwsS3Adapter
 import io.onema.vff.extensions.StreamExtensions._
 import javax.activation.{DataHandler, FileDataSource}
 import javax.mail.internet.{InternetAddress, MimeBodyPart, MimeMultipart}
@@ -110,10 +110,11 @@ object MailerLogic {
   }
 }
 
-class MailerLogic(val sesClient: AmazonSimpleEmailService, val table: Table, val s3Client: AmazonS3, val local: FileSystem, val bucketName: String, val shouldLogEmail: Boolean) {
+class MailerLogic(val sesClient: AmazonSimpleEmailService, val s3Client: AmazonS3, val dynamoDbClient: AmazonDynamoDB, val local: FileSystem, tableName: String, val bucketName: String, val shouldLogEmail: Boolean) {
 
   //--- Fields ---
   protected val log = Logger("mailer-logic")
+  private val table = Table[BounceComplaintItem](tableName)
 
   //--- Methods ---
   def handleRequest(email: Email): Unit = {
@@ -148,10 +149,10 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val table: Table, val
   def isNotBlocked(destinationAddress: String): Boolean = {
     Try(findEmail(destinationAddress)) match {
       case Success(response) =>
-        log.debug(s"Successfully query the ${table.getTableName} table")
+        log.debug(s"Successfully query the $tableName table")
 
         // If it does find any items in the table, the address is not blocked
-        !response.iterator().hasNext
+        !response.exists(_.isRight)
       case Failure(ex) =>
         log.error("Unable to read from table")
         throw ex
@@ -163,12 +164,10 @@ class MailerLogic(val sesClient: AmazonSimpleEmailService, val table: Table, val
     * @param destinationAddress destination address to check for
     * @return
     */
-  private def findEmail(destinationAddress: String): ItemCollection[QueryOutcome]  = {
-    val index = table.getIndex("EmailIndex")
-    val query = new QuerySpec()
-      .withKeyConditionExpression("DestinationAddress = :v_email")
-      .withValueMap(new ValueMap().withString(":v_email", destinationAddress))
-    index.query(query)
+  private def findEmail(destinationAddress: String): Seq[Either[DynamoReadError, BounceComplaintItem]] = {
+    val emailIndex = table.index("EmailIndex")
+    val operations = emailIndex.query('destinationAddress -> destinationAddress)
+    Scanamo.exec(dynamoDbClient)(operations)
   }
 
   /**
