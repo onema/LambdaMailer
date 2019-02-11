@@ -13,6 +13,8 @@ iamRoleStatements:
     Resource:
       - Fn::GetAtt: [ LambdaMailerTable, Arn ]
       - Fn::Join: ["/", [ Fn::GetAtt: [LambdaMailerTable, Arn], "index", "*"]]
+      - Fn::GetAtt: [ ForwarderMappingTable, Arn ]
+      - Fn::Join: ["/", [ Fn::GetAtt: [ForwarderMappingTable, Arn], "index", "*"]]
   - Effect: Allow
     Action:
       - ses:SendEmail
@@ -20,12 +22,12 @@ iamRoleStatements:
     Resource:
       - "*"
 
-  - Effect: Allow
-    Action:
-      - sqs:SendMessageBatch
-      - sqs:SendMessage
-    Resource:
-      - Fn::ImportValue: "${self:custom.stageName}-dead-letter-queue-arn"
+#  - Effect: Allow
+#    Action:
+#      - sqs:SendMessageBatch
+#      - sqs:SendMessage
+#    Resource:
+#      - Fn::ImportValue: "${self:custom.stageName}-dead-letter-queue-arn"
   - Effect: Allow
     Action:
       - s3:GetObject
@@ -41,6 +43,7 @@ iamRoleStatements:
       - Fn::GetAtt: [MailerAttachments, Arn]
 
 environment:
+  REPORT_EXCEPTION: true
   STAGE_NAME: ${self:custom.stageName}
   LOG_LEVEL: DEBUG
   APP_NAME: ${self:service}
