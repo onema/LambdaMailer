@@ -12,7 +12,6 @@
 package io.onema.forwarder
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
-import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.sns.AmazonSNSClientBuilder
@@ -28,15 +27,14 @@ class ForwarderFunction extends LambdaHandler[SesEvent, Unit] with EnvLambdaConf
   private val shouldLog = logEmail.isDefined && logEmail.getOrElse("false").toBoolean
   private val tableName = getValue("mapping/table").getOrElse("mapping-table")
   private val dynamodbClient = AmazonDynamoDBClientBuilder.defaultClient()
-  private val table = new DynamoDB(dynamodbClient).getTable(tableName)
   val logic = new ForwarderLogic(
     snsClient = AmazonSNSClientBuilder.defaultClient(),
     s3Client = AmazonS3ClientBuilder.defaultClient(),
-    table = table,
+    dynamoDbClient = dynamodbClient,
+    tableName = tableName,
     mailerTopic = getValue("sns/mailer/topic").get,
     bucketName = getValue("forwarder/s3/bucket").get,
-    attachmentBucket = getValue("attachment/bucket").get,
-    shouldLog
+    attachmentBucket = getValue("attachment/bucket").get, shouldLog
   )
 
   //--- Methods ---

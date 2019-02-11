@@ -15,15 +15,12 @@ import java.io.ByteArrayInputStream
 import java.util.Properties
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
-import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec
-import com.amazonaws.services.dynamodbv2.document.utils.ValueMap
-import com.amazonaws.services.dynamodbv2.document.{ItemCollection, QueryOutcome, Table}
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.sns.AmazonSNS
 import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
-import io.onema.forwarder.ForwarderLogic.SesMessage
+import io.onema.forwarder.ForwarderLogic.{ForwarderMappingItem, SesMessage}
 import io.onema.json.Extensions._
 import io.onema.mailer.MailerLogic.Email
 import io.onema.userverless.monitoring.LogMetrics._
@@ -37,11 +34,16 @@ import org.apache.commons.mail.util.MimeMessageParser
 import org.json4s.FieldSerializer._
 import org.json4s.jackson.Serialization
 import org.json4s.{FieldSerializer, Formats, NoTypeHints}
+import com.gu.scanamo.error.DynamoReadError
+import com.gu.scanamo.syntax._
+import com.gu.scanamo._
 
 import scala.collection.JavaConverters._
 import scala.io.Source
 
 object ForwarderLogic {
+  case class ForwarderMappingItem(forwardingEmail: String, destinationEmail: String)
+
   case class Headers(name: String, value: String)
   case class CommonHeaders(returnPath: String, from: List[String], date: String, to: List[String], subject: String, messageId: Option[String], replyTo: Option[List[String]], sender: Option[String])
   case class Mail(
@@ -83,11 +85,12 @@ object ForwarderLogic {
   }
 }
 
-class ForwarderLogic(snsClient: AmazonSNS, val s3Client: AmazonS3, val table: Table, val mailerTopic: String, val bucketName: String, val attachmentBucket: String, val logEmail: Boolean = false) {
+class ForwarderLogic(snsClient: AmazonSNS, val s3Client: AmazonS3, val dynamoDbClient: AmazonDynamoDB, val tableName: String, val mailerTopic: String, val bucketName: String, val attachmentBucket: String, val logEmail: Boolean = false) {
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
   private val s3 = new FileSystem(new AwsS3Adapter(s3Client, attachmentBucket))
+  private val table = Table[ForwarderMappingItem](tableName)
 
   //--- Methods ---
   def handleRequest(message: SesMessage): Unit = {
@@ -174,20 +177,22 @@ class ForwarderLogic(snsClient: AmazonSNS, val s3Client: AmazonS3, val table: Ta
   }
 
   def getEmails(forwardingEmail: String): (String, Seq[String]) = {
-    val items = findEmail(forwardingEmail).iterator().asScala
-    if(items.isEmpty) {
+    val items = findEmail(forwardingEmail)
+
+    // Warn if there are any read errors in the sequence but don't
+    if(items.exists(_.isLeft)) {
+      log.warn("There were errors reading items from the table")
+    }
+    val destination = items.filter(_.isRight)
+      .map(_.right.get.destinationEmail)
+    if(destination.isEmpty) {
       throw new Exception(s"The email $forwardingEmail does not contain any mapping values")
     }
-    val destination = items.map(i => i.getString("DestinationEmail")).toSeq
-    log.info(s"DESTINATION EMAILS: $destination")
     forwardingEmail -> destination
   }
 
-  private def findEmail(forwardingEmail: String): ItemCollection[QueryOutcome] = {
-    val querySpec = new QuerySpec()
-      .withKeyConditionExpression("ForwardingEmail = :v_email")
-      .withValueMap(new ValueMap().withString(":v_email", forwardingEmail))
-    table.query(querySpec)
-
+  private def findEmail(forwardingEmail: String): Seq[Either[DynamoReadError, ForwarderMappingItem]] = {
+    val operations = table.query('forwardingEmail -> forwardingEmail)
+    Scanamo.exec(dynamoDbClient)(operations)
   }
 }
