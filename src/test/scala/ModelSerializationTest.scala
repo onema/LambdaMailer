@@ -9,7 +9,7 @@
   * @author Juan Manuel Torres <software@onema.io>
   */
 
-import io.onema.bounce.Logic.SesNotification
+import io.onema.bounce.BounceLogic.SesNotification
 import io.onema.forwarder.ForwarderFunction
 import io.onema.json.Extensions._
 import org.scalatest.{FlatSpec, Matchers}
@@ -34,7 +34,7 @@ class ModelSerializationTest extends FlatSpec with Matchers {
     // Arrange
     val realEvent = """{"Records":[{"eventSource":"aws:ses","eventVersion":"1.0","ses":{"mail":{"timestamp":"2019-01-28T18:04:21.476Z","source":"foo@bar.com","messageId":"9uoo2i","destination":["ibc32@blah.com"],"headersTruncated":false,"headers":[{"name":"Return-Path","value":"<foo@bar.com>"}],"commonHeaders":{"returnPath":"foo@bar.com","from":["Foo Bar<foo@bar.com>"],"sender":"Foo Bar<foo@bar.com>","replyTo":["Foo Bar<foo@bar.com>"],"date":"28 Jan 2019 11:04:20 -0700","to":["ibc32@blah.com"],"subject":"Foo bar want's to send you a message!!!!!"}},"receipt":{"timestamp":"2019-01-28T18:04:21.476Z","processingTimeMillis":519,"recipients":["ibc32@blah.com"],"spamVerdict":{"status":"PASS"},"virusVerdict":{"status":"PASS"},"spfVerdict":{"status":"GRAY"},"dkimVerdict":{"status":"PASS"},"dmarcVerdict":{"status":"GRAY"},"action":{"type":"Lambda","functionArn":"arn:aws:lambda:us-east-1:1234567890123:function:lambda-mailer-dev-forwarder","invocationType":"Event"}}}}]}"""
     class TestableForwarderFunction extends ForwarderFunction {
-      override def getValue(path: String): Option[String] = Some("")
+      override def getValue(path: String): Option[String] = Some("false")
     }
     val function = new TestableForwarderFunction
 
