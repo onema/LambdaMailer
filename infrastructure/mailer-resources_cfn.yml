@@ -1,74 +1,52 @@
 Parameters:
-  PartitionKey:
-    Type: String
-    Default: MessageId
-    Description: The name of the main parition key
-  SortKey:
-    Type: String
-    Default: SnsPublishTime
-    Description: The name of the primary sort key
-  SecondaryIndex:
-    Type: String
-    Default: DestinationAddress
-    Description: The name of the secondary index
-  ReadCapacityUnits:
-    Default: 1
-    Description: Dynamo read capacity units
-    Type: Number
-  WriteCapacityUnits:
-    Default: 1
-    Description: Dynamo write capacity units
-    Type: Number
   StageName:
     Default: "${self:custom.stageName}"
     Description: The name of the current stage
     Type: String
 
 Resources:
+  ForwarderMappingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: forwardingEmail
+          AttributeType: S
+        - AttributeName: destinationEmail
+          AttributeType: S
+      KeySchema:
+        - AttributeName: forwardingEmail
+          KeyType: HASH
+        - AttributeName: destinationEmail
+          KeyType: RANGE
 
   LambdaMailerTable:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-      - AttributeName:
-          Ref: PartitionKey
+      - AttributeName: messageId
         AttributeType: S
-      - AttributeName:
-          Ref: SortKey
+      - AttributeName: snsPublishTime
         AttributeType: S
-      - AttributeName:
-          Ref: SecondaryIndex
+      - AttributeName: destinationAddress
         AttributeType: S
 
       KeySchema:
-      - AttributeName:
-          Ref: PartitionKey
+      - AttributeName: messageId
         KeyType: HASH
-      - AttributeName:
-          Ref: SortKey
+      - AttributeName: snsPublishTime
         KeyType: RANGE
 
       GlobalSecondaryIndexes:
       - IndexName: EmailIndex
         KeySchema:
-        - AttributeName:
-            Ref: SecondaryIndex
+        - AttributeName: destinationAddress
           KeyType: HASH
         Projection:
           ProjectionType: ALL
-          # Change the billing mode to PROVISIONED and uncomment if you want to define the read/write capacity units
-#        ProvisionedThroughput:
-#          ReadCapacityUnits: 1
-#          WriteCapacityUnits: 1
-#      ProvisionedThroughput:
-#        ReadCapacityUnits:
-#          Ref: ReadCapacityUnits
-#        WriteCapacityUnits:
-#          Ref: WriteCapacityUnits
-
       TimeToLiveSpecification:
-        AttributeName: ExpirationTime
+        AttributeName: ttl
         Enabled: true
 
   MailerAttachments:

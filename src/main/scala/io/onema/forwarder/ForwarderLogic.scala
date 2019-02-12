@@ -14,12 +14,13 @@ package io.onema.forwarder
 import java.io.ByteArrayInputStream
 import java.util.Properties
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.sns.AmazonSNS
 import com.sun.mail.smtp.SMTPMessage
 import com.typesafe.scalalogging.Logger
-import io.onema.forwarder.ForwarderLogic.SesMessage
+import io.onema.forwarder.ForwarderLogic.{ForwarderMappingItem, SesMessage}
 import io.onema.json.Extensions._
 import io.onema.mailer.MailerLogic.Email
 import io.onema.userverless.monitoring.LogMetrics._
@@ -33,11 +34,16 @@ import org.apache.commons.mail.util.MimeMessageParser
 import org.json4s.FieldSerializer._
 import org.json4s.jackson.Serialization
 import org.json4s.{FieldSerializer, Formats, NoTypeHints}
+import com.gu.scanamo.error.DynamoReadError
+import com.gu.scanamo.syntax._
+import com.gu.scanamo._
 
 import scala.collection.JavaConverters._
 import scala.io.Source
 
 object ForwarderLogic {
+  case class ForwarderMappingItem(forwardingEmail: String, destinationEmail: String)
+
   case class Headers(name: String, value: String)
   case class CommonHeaders(returnPath: String, from: List[String], date: String, to: List[String], subject: String, messageId: Option[String], replyTo: Option[List[String]], sender: Option[String])
   case class Mail(
@@ -79,19 +85,18 @@ object ForwarderLogic {
   }
 }
 
-class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Client: AmazonS3, val bucketName: String, val attachmentBucket: String, val logEmail: Boolean = false) {
+class ForwarderLogic(snsClient: AmazonSNS, val s3Client: AmazonS3, val dynamoDbClient: AmazonDynamoDB, val tableName: String, val mailerTopic: String, val bucketName: String, val attachmentBucket: String, val logEmail: Boolean = false) {
 
   //--- Fields ---
   protected val log = Logger("forwarder-logic")
   private val s3 = new FileSystem(new AwsS3Adapter(s3Client, attachmentBucket))
+  private val table = Table[ForwarderMappingItem](tableName)
 
   //--- Methods ---
-  def handleRequest(message: SesMessage, emailMapping: String): Unit = {
+  def handleRequest(message: SesMessage): Unit = {
 
     // The email mapping will get us all the addresses associated with the forwarder address
-    val messageId = message.mail.messageId
-    val allowedForwardingEmailMapping = parseEmailMapping(emailMapping)
-    val resultingForwardingEmails = getForwardingEmailAddresses(message.receipt.recipients.map(_.toLowerCase), allowedForwardingEmailMapping)
+    val resultingForwardingEmails = message.receipt.recipients.map(_.toLowerCase).map(getEmails)
     log.debug(s"addresses found: $resultingForwardingEmails")
 
     // Get message from s3 and parse it
@@ -99,21 +104,25 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     val originalContent = Source.fromInputStream(responseInputStream).mkString
 
     // iterate over each mapped address and forward the email
-    resultingForwardingEmails.foreach{case (from, toEmails) =>
-      toEmails.foreach(to => {
-        val (parser, _) = parseMessage(originalContent)
-        val htmlContent = content(parser)
-        val att = attachments(parser, messageId)
-        val subject = message.mail.commonHeaders.subject
-        val originalSender: String = message.mail.commonHeaders.from.mkString(",")
+    for {
+      (from, toEmails) <- resultingForwardingEmails
+      to <- toEmails
+    } yield send(to, from, originalContent, message)
+  }
 
-        // Send message to mailer
-        val emailMessage = Email(Seq(to), from, subject, htmlContent, replyTo = Some(originalSender), attachments = att).asJson
-        log.debug(s"MESSAGE: $emailMessage", keyValue("SUBJECT", subject))
-        snsClient.publish(mailerTopic, emailMessage)
-        if(logEmail) count("ForwardingEmail", ("from email", originalSender))
-      })
-    }
+  private def send(to: String, from: String, originalContent: String, message: SesMessage): Unit = {
+    val messageId = message.mail.messageId
+    val (parser, _) = parseMessage(originalContent)
+    val htmlContent = content(parser)
+    val att = attachments(parser, messageId)
+    val subject = message.mail.commonHeaders.subject
+    val originalSender: String = message.mail.commonHeaders.from.mkString(",")
+
+    // Send message to mailer
+    val emailMessage = Email(Seq(to), from, subject, htmlContent, replyTo = Some(originalSender), attachments = att).asJson
+    log.debug(s"MESSAGE: $emailMessage", keyValue("SUBJECT", subject))
+    snsClient.publish(mailerTopic, emailMessage)
+    if(logEmail) count("ForwardingEmail", ("from email", originalSender))
   }
 
   private def parseMessage(content: String): (MimeMessageParser, SMTPMessage) = {
@@ -167,19 +176,23 @@ class ForwarderLogic(val snsClient: AmazonSNS, val mailerTopic: String, val s3Cl
     destinationName
   }
 
-  private def parseEmailMapping(mapping: String): Map[String, Seq[String]] = {
-    val parts = mapping
-      .split('&')
-      parts.map(x => {
-        val keyValueParts = x.split('=')
-        if(keyValueParts.length < 2) throw new Exception("The email mappings are not properly formatted, see documentation for more information.")
-        keyValueParts(0) -> keyValueParts(1).split(',').toSeq
-      }).toMap[String, Seq[String]]
+  def getEmails(forwardingEmail: String): (String, Seq[String]) = {
+    val items = findEmail(forwardingEmail)
+
+    // Warn if there are any read errors in the sequence but don't
+    if(items.exists(_.isLeft)) {
+      log.warn("There were errors reading items from the table")
+    }
+    val destination = items.filter(_.isRight)
+      .map(_.right.get.destinationEmail)
+    if(destination.isEmpty) {
+      throw new Exception(s"The email $forwardingEmail does not contain any mapping values")
+    }
+    forwardingEmail -> destination
   }
 
-  private def getForwardingEmailAddresses(destination: Seq[String], allowedForwardingEmailMapping: Map[String, Seq[String]]): Map[String, Seq[String]] = {
-    val resultingEmailsMapping = allowedForwardingEmailMapping.filterKeys(destination.contains)
-    if(resultingEmailsMapping.nonEmpty) resultingEmailsMapping
-    else throw new Exception(s"The destination emails $destination, do not contain a valid mapping in the configuration. Received $destination, allowed $allowedForwardingEmailMapping")
+  private def findEmail(forwardingEmail: String): Seq[Either[DynamoReadError, ForwarderMappingItem]] = {
+    val operations = table.query('forwardingEmail -> forwardingEmail)
+    Scanamo.exec(dynamoDbClient)(operations)
   }
 }

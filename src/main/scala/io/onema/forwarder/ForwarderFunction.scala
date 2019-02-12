@@ -11,41 +11,38 @@
 
 package io.onema.forwarder
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.sns.AmazonSNSClientBuilder
 import io.onema.forwarder.ForwarderLogic.SesEvent
 import io.onema.json.Extensions._
 import io.onema.userverless.configuration.lambda.EnvLambdaConfiguration
-import io.onema.userverless.function.Extensions._
 import io.onema.userverless.function.LambdaHandler
 
 class ForwarderFunction extends LambdaHandler[SesEvent, Unit] with EnvLambdaConfiguration {
 
   //--- Fields ---
   private val logEmail = getValue("/log/email")
-  private val shouldLog = if(logEmail.isDefined && logEmail.getOrElse("").toLowerCase() == "true") true else false
+  private val shouldLog = logEmail.isDefined && logEmail.getOrElse("false").toBoolean
+  private val tableName = getValue("mapping/table").getOrElse("mapping-table")
+  private val dynamodbClient = AmazonDynamoDBClientBuilder.defaultClient()
   val logic = new ForwarderLogic(
     snsClient = AmazonSNSClientBuilder.defaultClient(),
-    mailerTopic = getValue("sns/mailer/topic").get,
     s3Client = AmazonS3ClientBuilder.defaultClient(),
+    dynamoDbClient = dynamodbClient,
+    tableName = tableName,
+    mailerTopic = getValue("sns/mailer/topic").get,
     bucketName = getValue("forwarder/s3/bucket").get,
-    attachmentBucket = getValue("attachment/bucket").get,
-    shouldLog
+    attachmentBucket = getValue("attachment/bucket").get, shouldLog
   )
 
   //--- Methods ---
   def execute(sesEvent: SesEvent, context: Context): Unit = {
-    val accountId = context.accountId
-    val region = getValue("aws/region").get
-
-    // Get an email mapping like "foo@bar.com=baz@balh.com,baz1@balh.com&foo2@bar.com=blah@balh.com"
-    // and parse it into a dictionary of [sender, recipients] where the recipients are a sequence of strings
-    val emailMapping = getValue("email/mapping")
-    sesEvent.records.foreach(r => {
-      val sesMessage = r.ses
+    sesEvent.records.foreach(record => {
+      val sesMessage = record.ses
       log.debug(sesMessage.asJson)
-      logic.handleRequest(sesMessage, emailMapping.getOrElse(""))
+      logic.handleRequest(sesMessage)
     })
   }
 
