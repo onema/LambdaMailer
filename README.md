@@ -56,12 +56,9 @@ The forwarder allows you to receive messages sent by a SES rule set.
 
 The forwarder will receive emails sent to the given address and forward them to the associated email addresses.
 
-The association is a mapping that has the following format:
-
-```
-spam@example.com=my.rea.email@gmail.com,anotheremail@yahoo.com&foobar@example2.com=some@email.com
-```
-and it must be assigned to the `EMAIL_MAPPING` environment variable. 
+The association is recorded in a DynamoDB table with a partition key `forwardingEmail` and a sort key `destiantionEmail` to 
+uniquely identify the mapping. The dymanodb table is created in the resources section, and the name is available through 
+the environment variable `MAPPING_TABLE`
 
 In addition, you will need to set the forwarding email addresses in an active SES Rule Set.
 For more information see the installation instructions below.
