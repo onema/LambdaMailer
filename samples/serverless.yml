@@ -1,0 +1,78 @@
+#
+# This file is part of the ONEMA onema Package.
+# For the full copyright and license information,
+# please view the LICENSE file that was distributed
+# with this source code.
+#
+# copyright (c) 2018-2019, Juan Manuel Torres (http://onema.io)
+#
+# @author Juan Manuel Torres <software@onema.io>
+#
+service: lambda-mailer-forwarder
+
+provider:
+  name: aws
+  runtime: java8
+  profile: ${opt:profile, 'default'}
+  timeout: 30
+  versionFunctions: false
+  memorySize: 1024
+  stage: dev
+  region: us-east-1
+
+  # you can add statements to the Lambda function's IAM Role here
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - sns:Publish
+      Resource:
+        - "arn:aws:sns:*:*:${self:custom.stageName}-mailer"
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:Query
+      Resource:
+        - Fn::GetAtt: [ ForwarderMappingTable, Arn ]
+        - Fn::Join: ["/", [ Fn::GetAtt: [ForwarderMappingTable, Arn], "index", "*"]]
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource:
+        - Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
+        - Fn::GetAtt: [ForwarderS3Bucket, Arn]
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+      Resource:
+        - Fn::Join: ["/", [Fn::GetAtt: [MailerAttachments, Arn], "*"]]
+        - Fn::GetAtt: [MailerAttachments, Arn]
+
+  # Service wide environment variables
+  environment:
+    REPORT_EXCEPTION: true
+    STAGE_NAME: ${self:custom.stageName}
+    LOG_LEVEL: DEBUG
+    APP_NAME: ${self:service}
+    ATTACHMENT_BUCKET:
+      Ref: MailerAttachments
+
+custom:
+  stageName: ${opt:stage, self:provider.stage}
+
+package:
+  artifact: target/scala-2.12/app.jar
+
+functions:
+  forwarder:
+    handler: io.onema.forwarder.ForwarderFunction::lambdaHandler
+    environment:
+      SNS_MAILER_TOPIC:
+        Fn::Join: [":", ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
+#      EMAIL_MAPPING: ${env:EMAIL_MAPPING}
+      MAPPING_TABLE:
+        Ref: ForwarderMappingTable
+      FORWARDER_S3_BUCKET:
+        Ref: ForwarderS3Bucket
+      REPORT_EXCEPTION: true

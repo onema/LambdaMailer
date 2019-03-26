@@ -6,12 +6,12 @@ lazy val root = (project in file("."))
 
   name := "lambda-mailer",
 
-  version := "0.8.0",
+  version := "0.9.0",
 
-  scalaVersion := "2.12.7",
+  scalaVersion := "2.12.8",
 
   libraryDependencies ++= {
-    val awsSdkVersion = "1.11.451"
+    val awsSdkVersion = "1.11.525"
     Seq(
       
       // dependencies

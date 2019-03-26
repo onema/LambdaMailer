@@ -11,10 +11,8 @@ iamRoleStatements:
       - dynamodb:GetItem
       - dynamodb:Query
     Resource:
-      - Fn::GetAtt: [ LambdaMailerTable, Arn ]
-      - Fn::Join: ["/", [ Fn::GetAtt: [LambdaMailerTable, Arn], "index", "*"]]
-      - Fn::GetAtt: [ ForwarderMappingTable, Arn ]
-      - Fn::Join: ["/", [ Fn::GetAtt: [ForwarderMappingTable, Arn], "index", "*"]]
+      - Fn::GetAtt: [ LambdaMailerBounceTable, Arn ]
+      - Fn::Join: ["/", [ Fn::GetAtt: [LambdaMailerBounceTable, Arn], "index", "*"]]
   - Effect: Allow
     Action:
       - ses:SendEmail
@@ -22,18 +20,12 @@ iamRoleStatements:
     Resource:
       - "*"
 
-#  - Effect: Allow
-#    Action:
-#      - sqs:SendMessageBatch
-#      - sqs:SendMessage
-#    Resource:
-#      - Fn::ImportValue: "${self:custom.stageName}-dead-letter-queue-arn"
   - Effect: Allow
     Action:
-      - s3:GetObject
+      - sqs:SendMessageBatch
+      - sqs:SendMessage
     Resource:
-      - Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
-      - Fn::GetAtt: [ForwarderS3Bucket, Arn]
+      - Fn::ImportValue: "${self:custom.stageName}-dead-letter-queue-arn"
   - Effect: Allow
     Action:
       - s3:PutObject
