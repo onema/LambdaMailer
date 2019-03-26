@@ -51,7 +51,7 @@ emails. If the email is found in the table, it is filtered out.
 You must subscribe the bounce and complaint notifications to the bounce. See the installation section
 for more information.
 
-### Lambda Mailer Forwarder
+### Lambda Mailer Forwarder Sample
 The forwarder allows you to receive messages sent by a SES rule set. 
 
 The forwarder will receive emails sent to the given address and forward them to the associated email addresses.

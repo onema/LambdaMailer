@@ -5,22 +5,7 @@ Parameters:
     Type: String
 
 Resources:
-  ForwarderMappingTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: forwardingEmail
-          AttributeType: S
-        - AttributeName: destinationEmail
-          AttributeType: S
-      KeySchema:
-        - AttributeName: forwardingEmail
-          KeyType: HASH
-        - AttributeName: destinationEmail
-          KeyType: RANGE
-
-  LambdaMailerTable:
+  LambdaMailerBounceTable:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
@@ -57,33 +42,7 @@ Resources:
           - ExpirationInDays: 30
             Id: delete-after-30-days
             Status: Enabled
-  ForwarderS3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      LifecycleConfiguration:
-        Rules:
-          - ExpirationInDays: 30
-            Id: delete-after-30-days
-            Status: Enabled
-  ForwarderS3BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket:
-        Ref: ForwarderS3Bucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: GiveSESPermissionToWriteEmail
-            Effect: Allow
-            Principal:
-              Service: "ses.amazonaws.com"
-            Action: s3:PutObject
-            Resource:
-              Fn::Join: ["/", [Fn::GetAtt: [ForwarderS3Bucket, Arn], "*"]]
-            Condition:
-              StringEquals:
-                aws:Referer:
-                  Ref: AWS::AccountId
+
   CreateTestDBPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -115,24 +74,20 @@ Outputs:
 
   EmailBounceAndComplaintTable:
     Value:
-      Ref: LambdaMailerTable
+      Ref: LambdaMailerBounceTable
 
   MailerAttachmentsS3BucketArn:
     Value:
       Fn::GetAtt: [MailerAttachments, Arn]
     Description: ARN of S3 bucket for storing mailer attachments
+    Export:
+      Name:
+        Fn::Join: ["-", [Ref: StageName, "lambda-mailer-attachments-arn"]]
 
   MailerAttachmentsS3BucketName:
     Value:
       Ref: MailerAttachments
     Description: Name of S3 bucket for storing mailer attachments
-
-  ForwarderS3BucketArn:
-    Value:
-      Fn::GetAtt: [ForwarderS3Bucket, Arn]
-    Description: ARN of S3 bucket for the forwarding email content
-
-  ForwarderS3BucketName:
-    Value:
-      Ref: ForwarderS3Bucket
-    Description: Name of S3 bucket for the forwarding email content
+    Export:
+      Name:
+        Fn::Join: ["-", [Ref: StageName, "lambda-mailer-attachments"]]

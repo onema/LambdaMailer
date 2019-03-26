@@ -43,7 +43,7 @@ functions:
     handler: io.onema.bounce.BounceFunction::lambdaHandler
     environment:
       TABLE_NAME:
-        Ref: LambdaMailerTable
+        Ref: LambdaMailerBounceTable
       REPORT_EXCEPTION: true
     events:
       - sns: ${self:custom.stageName}-mailer-bounce
@@ -54,25 +54,11 @@ functions:
     environment:
       LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
       TABLE_NAME:
-        Ref: LambdaMailerTable
+        Ref: LambdaMailerBounceTable
       # Do not report error exceptions for the mailer
       REPORT_EXCEPTION: false
     events:
       - sns: ${self:custom.stageName}-mailer
-
-  forwarder:
-    handler: io.onema.forwarder.ForwarderFunction::lambdaHandler
-    environment:
-      SNS_MAILER_TOPIC:
-        Fn::Join: [":", ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
-#      EMAIL_MAPPING: ${env:EMAIL_MAPPING}
-      MAPPING_TABLE:
-        Ref: ForwarderMappingTable
-      FORWARDER_S3_BUCKET:
-        Ref: ForwarderS3Bucket
-      REPORT_EXCEPTION: true
-#    events:
-#      - sns: ${self:custom.stageName}-mail-forwarder
 
 # you can add CloudFormation resource templates here
 resources:
