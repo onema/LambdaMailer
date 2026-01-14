@@ -10,18 +10,22 @@
 #
 service: lambda-mailer
 
+frameworkVersion: '>=3.0.0 <4.0.0'
+
 provider:
   name: aws
-  runtime: java8
+  runtime: java17
+  architecture: x86_64
   profile: ${opt:profile, 'default'}
   timeout: 30
-  versionFunctions: false
   memorySize: 1024
-  stage: dev
-  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
 
   # you can add statements to the Lambda function's IAM Role here
-  iamRoleStatements: ${file(infrastructure/global-values.yml):iamRoleStatements}
+  iam:
+    role:
+      statements: ${file(infrastructure/global-values.yml):iamRoleStatements}
 
   # Service wide environment variables
   environment: ${file(infrastructure/global-values.yml):environment}
@@ -42,8 +46,7 @@ functions:
   mailer-bounce:
     handler: io.onema.bounce.BounceFunction::lambdaHandler
     environment:
-      TABLE_NAME:
-        Ref: LambdaMailerTable
+      TABLE_NAME: !Ref LambdaMailerTable
       REPORT_EXCEPTION: true
     events:
       - sns: ${self:custom.stageName}-mailer-bounce
@@ -52,9 +55,8 @@ functions:
     handler: io.onema.mailer.MailerFunction::lambdaHandler
     reservedConcurrency: 1
     environment:
-      LOG_EMAIL:  ${env:LOG_EMAIL, 'false'}
-      TABLE_NAME:
-        Ref: LambdaMailerTable
+      LOG_EMAIL: ${env:LOG_EMAIL, 'false'}
+      TABLE_NAME: !Ref LambdaMailerTable
       # Do not report error exceptions for the mailer
       REPORT_EXCEPTION: false
     events:
@@ -63,13 +65,9 @@ functions:
   forwarder:
     handler: io.onema.forwarder.ForwarderFunction::lambdaHandler
     environment:
-      SNS_MAILER_TOPIC:
-        Fn::Join: [":", ["arn:aws:sns", Ref: "AWS::Region", Ref: "AWS::AccountId", "${self:custom.stageName}-mailer"]]
-#      EMAIL_MAPPING: ${env:EMAIL_MAPPING}
-      MAPPING_TABLE:
-        Ref: ForwarderMappingTable
-      FORWARDER_S3_BUCKET:
-        Ref: ForwarderS3Bucket
+      SNS_MAILER_TOPIC: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${self:custom.stageName}-mailer'
+      MAPPING_TABLE: !Ref ForwarderMappingTable
+      FORWARDER_S3_BUCKET: !Ref ForwarderS3Bucket
       REPORT_EXCEPTION: true
 #    events:
 #      - sns: ${self:custom.stageName}-mail-forwarder
